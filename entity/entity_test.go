@@ -8,6 +8,7 @@ import (
 // effects are applied at all
 func TestEffectAddition(t *testing.T) {
   ent := NewEntity()
+
   ent.AddEffect(effects.NewBaseCharEffect(&map[string]int{
       "STR": 10,
       "DEX": 10,

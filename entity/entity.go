@@ -1,8 +1,11 @@
 package entity
 
 import (
-  "github.com/swwu/battlemap-server/effects"
-  "sort"
+  "github.com/swwu/v8.go"
+
+  "github.com/swwu/battlemap-server/scripting"
+  "github.com/swwu/battlemap-server/effect"
+  "github.com/swwu/battlemap-server/logging"
 )
 
 type Footprint struct {
@@ -13,52 +16,47 @@ type Collider interface {
   Footprint() Footprint
 }
 
-// an entity is defined by its variables and its effects
+// an entity is defined by its variables and its effect
 type Entity interface {
-  Variables() map[string]int
+  Variables() map[string]float64
 
   Reset()
   Calculate()
   Recalculate()
 
-  AddEffect(eff effects.Effect)
+  AddEffect(eff effect.Effect)
+
+  // returns a *v8.Value instead of *v8.Object (since object can't be easily
+  // converted back to value)
+  GetV8Accessor() *v8.ObjectTemplate
 }
 
 type entity struct {
-  variables map[string]int
+  variables map[string]float64
 
-  effects []effects.Effect
-}
-
-// sorting boilerplate
-type ByPriority []effects.Effect
-func (a ByPriority) Len() int           { return len(a) }
-func (a ByPriority) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a ByPriority) Less(i, j int) bool {
-  return a[i].Priority() < a[j].Priority()
+  effects []effect.Effect
 }
 
 
 func NewEntity() (ent Entity) {
   return &entity {
-    variables: make(map[string]int),
-    effects: make([]effects.Effect, 0),
+    variables: map[string]float64{},
+    effects: []effect.Effect{},
   }
 }
 
 
-func (ent *entity) Variables() map[string]int {
+func (ent *entity) Variables() map[string]float64 {
   return ent.variables
 }
 
 func (ent *entity) Reset() {
-  ent.variables = make(map[string]int)
+  ent.variables = map[string]float64{}
 }
 
 func (ent *entity) Calculate() {
-  sort.Sort(ByPriority(ent.effects))
   for _,eff := range ent.effects {
-    eff.DoEffect(&ent.variables)
+    eff.OnEffect(ent)
   }
 }
 
@@ -68,7 +66,44 @@ func (ent *entity) Recalculate() {
 }
 
 
-func (ent *entity) AddEffect(eff effects.Effect) {
+func (ent *entity) AddEffect(eff effect.Effect) {
   ent.effects = append(ent.effects, eff)
 }
+
+
+func (ent *entity) GetV8Accessor() *v8.ObjectTemplate {
+  engine := scripting.GetEngine()
+
+  objTemplate := engine.NewObjectTemplate()
+
+  objTemplate.SetNamedPropertyHandler(
+    // get
+    func(name string, info v8.PropertyCallbackInfo) {
+      info.ReturnValue().Set(engine.NewNumber(ent.variables[name]))
+    },
+    // set
+    func(name string, value *v8.Value, info v8.PropertyCallbackInfo) {
+      if value.IsNumber() {
+        ent.variables[name] = scripting.NumberFromV8Value(value, ent.variables[name])
+        info.ReturnValue().Set(value)
+      } else {
+        logging.Warning.Println(
+          "Attempted to insert non-numerical value into entity variables")
+      }
+    },
+    // query
+    func(name string, info v8.PropertyCallbackInfo) {
+    },
+    // delete
+    func(name string, info v8.PropertyCallbackInfo) {
+    },
+    // enumerate
+    func(info v8.PropertyCallbackInfo) {
+    },
+    nil,
+    )
+
+  return objTemplate
+}
+
 
