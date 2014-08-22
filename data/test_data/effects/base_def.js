@@ -9,21 +9,21 @@
 
 var stats = ["STR","DEX","CON","WIS","INT","CHA"];
 
-addEffect({
-  id: "baseDef",
+define.effect({
+  id: "baseStats",
   displayName: "Base Rules Stats",
   displayType: "base",
   depends: [],
-  tags: ["statChange"],
+  tags: ["statChange.statBase"],
 
   onEffect: function(entity) {
     for (var i=0; i<stats.length; i++) {
-      entity[stats[i]] = 18;
+      entity.vars[stats[i]] = 18;
     }
   }
 });
 
-addEffect({
+define.effect({
   id: "statMods",
   displayName: "Base Rules Stat Mods",
   displayType: "base",
@@ -31,7 +31,7 @@ addEffect({
 
   onEffect: function(entity) {
     for (var i=0; i<stats.length; i++) {
-      entity[stats[i]+".MOD"] = Math.floor((entity[stats[i]]-10)/2);
+      entity.vars[stats[i]+".MOD"] = Math.floor((entity.vars[stats[i]]-10)/2);
     }
   }
 })

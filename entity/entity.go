@@ -74,9 +74,9 @@ func (ent *entity) AddEffect(eff effect.Effect) {
 func (ent *entity) V8Accessor() *v8.ObjectTemplate {
   engine := scripting.GetEngine()
 
-  objTemplate := engine.NewObjectTemplate()
+  varTemplate := engine.NewObjectTemplate()
 
-  objTemplate.SetNamedPropertyHandler(
+  varTemplate.SetNamedPropertyHandler(
     // get
     func(name string, info v8.PropertyCallbackInfo) {
       info.ReturnValue().Set(engine.NewNumber(ent.variables[name]))
@@ -102,6 +102,21 @@ func (ent *entity) V8Accessor() *v8.ObjectTemplate {
     },
     nil,
     )
+
+  objTemplate := engine.NewObjectTemplate()
+  objTemplate.SetAccessor("vars",
+    // get
+    func(name string, info v8.AccessorCallbackInfo) {
+      info.ReturnValue().Set(engine.NewInstanceOf(varTemplate))
+    },
+    // set
+    func(name string, value *v8.Value, info v8.AccessorCallbackInfo) {
+      logging.Warning.Println("Attempted to overwrite entity.vars")
+    },
+    nil,
+    v8.PA_ReadOnly,
+  )
+
 
   return objTemplate
 }

@@ -1,14 +1,9 @@
 package effect
 
 import (
-  "path/filepath"
-  "os"
-  "io/ioutil"
-
   "github.com/swwu/v8.go"
 
   "github.com/swwu/battlemap-server/scripting"
-  "github.com/swwu/battlemap-server/logging"
 )
 
 /*
@@ -34,6 +29,16 @@ type scriptEffect struct {
   displayName string
   displayType string
   onEffectFn *v8.Function
+}
+
+func NewScriptEffect(id string, displayName string, displayType string,
+onEffectFn *v8.Function) Effect {
+  return &scriptEffect{
+      id: id,
+      displayName: displayName,
+      displayType: displayType,
+      onEffectFn: onEffectFn,
+  }
 }
 
 
@@ -70,7 +75,6 @@ func (eff *scriptEffect) OnEffect(ent V8AccessorProvider) {
 
 }
 
-
 /*
  * Functions for loading scriptEffects from ,js files
 */
@@ -80,7 +84,7 @@ func GenerateScriptEffect(defaultId string, script []byte, effs []Effect,
   engine := scripting.GetEngine()
   global := engine.NewObjectTemplate()
 
-  global.Bind("addEffect", func(obj *v8.Object) {
+  global.Bind("defineEffect", func(obj *v8.Object) {
 
     ret := &scriptEffect{
       id: defaultId,
@@ -108,36 +112,4 @@ func GenerateScriptEffect(defaultId string, script []byte, effs []Effect,
 }
 
 
-// read all js files from data/effects to make effects
-func ReadEffects() (map[string]Effect, error) {
-  effects := make([]Effect, 0)
-
-  root := "data/effects/"
-  err := filepath.Walk(root, func(path string, f os.FileInfo, err error) error {
-    if path[len(path)-3:] == ".js" {
-      logging.Info.Println("Loading:",path)
-      bytes, err := ioutil.ReadFile(path)
-      if err != nil {
-        return err
-      }
-
-      cbChan := make(chan int)
-      go GenerateScriptEffect(path[len(root):len(path)-3], bytes, effects,
-      func(effs []Effect) error {
-        effects = effs
-        cbChan <- 1
-        return nil
-      })
-      <-cbChan
-    }
-    return nil
-  })
-
-  ret := map[string]Effect{}
-  for _, effect := range effects {
-    ret[effect.Id()] = effect
-  }
-
-  return ret, err
-}
 
