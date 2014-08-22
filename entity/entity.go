@@ -28,7 +28,7 @@ type Entity interface {
 
   // returns a *v8.Value instead of *v8.Object (since object can't be easily
   // converted back to value)
-  GetV8Accessor() *v8.ObjectTemplate
+  V8Accessor() *v8.ObjectTemplate
 }
 
 type entity struct {
@@ -71,7 +71,7 @@ func (ent *entity) AddEffect(eff effect.Effect) {
 }
 
 
-func (ent *entity) GetV8Accessor() *v8.ObjectTemplate {
+func (ent *entity) V8Accessor() *v8.ObjectTemplate {
   engine := scripting.GetEngine()
 
   objTemplate := engine.NewObjectTemplate()

@@ -20,11 +20,11 @@ type Effect interface {
   DisplayType() string
   /* in general +- should be on priority 0, /* should be on priority 1 */
 
-  OnEffect(ent V8ObjectProvider)
+  OnEffect(ent V8AccessorProvider)
 }
 
-type V8ObjectProvider interface {
-  GetV8Accessor() *v8.ObjectTemplate
+type V8AccessorProvider interface {
+  V8Accessor() *v8.ObjectTemplate
 }
 
 
@@ -49,21 +49,21 @@ func (eff *scriptEffect) DisplayType() string {
   return eff.displayType
 }
 
-func (eff *scriptEffect) OnEffect(ent V8ObjectProvider) {
+func (eff *scriptEffect) OnEffect(ent V8AccessorProvider) {
   if eff.onEffectFn == nil {
     // function is nil? nothing to do
     return
   }
 
   engine := scripting.GetEngine()
-  objTemplate := ent.GetV8Accessor()
-  cbChan := make(chan int)
+  objTemplate := ent.V8Accessor()
 
   context := engine.NewContext(nil)
 
+  cbChan := make(chan int)
   go context.Scope(func(cs v8.ContextScope) {
-    cbChan <- 1
     eff.onEffectFn.Call(engine.NewInstanceOf(objTemplate))
+    cbChan <- 1
   })
 
   <-cbChan
