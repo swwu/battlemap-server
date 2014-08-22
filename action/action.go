@@ -4,5 +4,5 @@ type Action interface {
 }
 
 func NewScriptAction() Action {
-  return nil
+	return nil
 }

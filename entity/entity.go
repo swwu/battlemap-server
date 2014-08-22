@@ -1,124 +1,116 @@
 package entity
 
 import (
-  "github.com/swwu/v8.go"
+	"github.com/swwu/v8.go"
 
-  "github.com/swwu/battlemap-server/scripting"
-  "github.com/swwu/battlemap-server/effect"
-  "github.com/swwu/battlemap-server/logging"
+	"github.com/swwu/battlemap-server/effect"
+	"github.com/swwu/battlemap-server/logging"
+	"github.com/swwu/battlemap-server/scripting"
 )
 
 type Footprint struct {
-
 }
 
 type Collider interface {
-  Footprint() Footprint
+	Footprint() Footprint
 }
 
 // an entity is defined by its variables and its effect
 type Entity interface {
-  Variables() map[string]float64
+	Variables() map[string]float64
 
-  Reset()
-  Calculate()
-  Recalculate()
+	Reset()
+	Calculate()
+	Recalculate()
 
-  AddEffect(eff effect.Effect)
+	AddEffect(eff effect.Effect)
 
-  // returns a *v8.Value instead of *v8.Object (since object can't be easily
-  // converted back to value)
-  V8Accessor() *v8.ObjectTemplate
+	// returns a *v8.Value instead of *v8.Object (since object can't be easily
+	// converted back to value)
+	V8Accessor() *v8.ObjectTemplate
 }
 
 type entity struct {
-  variables map[string]float64
+	variables map[string]float64
 
-  effects []effect.Effect
+	effects []effect.Effect
 }
-
 
 func NewEntity() (ent Entity) {
-  return &entity {
-    variables: map[string]float64{},
-    effects: []effect.Effect{},
-  }
+	return &entity{
+		variables: map[string]float64{},
+		effects:   []effect.Effect{},
+	}
 }
 
-
 func (ent *entity) Variables() map[string]float64 {
-  return ent.variables
+	return ent.variables
 }
 
 func (ent *entity) Reset() {
-  ent.variables = map[string]float64{}
+	ent.variables = map[string]float64{}
 }
 
 func (ent *entity) Calculate() {
-  for _,eff := range ent.effects {
-    eff.OnEffect(ent)
-  }
+	for _, eff := range ent.effects {
+		eff.OnEffect(ent)
+	}
 }
 
 func (ent *entity) Recalculate() {
-  ent.Reset()
-  ent.Calculate()
+	ent.Reset()
+	ent.Calculate()
 }
-
 
 func (ent *entity) AddEffect(eff effect.Effect) {
-  ent.effects = append(ent.effects, eff)
+	ent.effects = append(ent.effects, eff)
 }
-
 
 func (ent *entity) V8Accessor() *v8.ObjectTemplate {
-  engine := scripting.GetEngine()
+	engine := scripting.GetEngine()
 
-  varTemplate := engine.NewObjectTemplate()
+	varTemplate := engine.NewObjectTemplate()
 
-  varTemplate.SetNamedPropertyHandler(
-    // get
-    func(name string, info v8.PropertyCallbackInfo) {
-      info.ReturnValue().Set(engine.NewNumber(ent.variables[name]))
-    },
-    // set
-    func(name string, value *v8.Value, info v8.PropertyCallbackInfo) {
-      if value.IsNumber() {
-        ent.variables[name] = scripting.NumberFromV8Value(value, ent.variables[name])
-        info.ReturnValue().Set(value)
-      } else {
-        logging.Warning.Println(
-          "Attempted to insert non-numerical value into entity variables")
-      }
-    },
-    // query
-    func(name string, info v8.PropertyCallbackInfo) {
-    },
-    // delete
-    func(name string, info v8.PropertyCallbackInfo) {
-    },
-    // enumerate
-    func(info v8.PropertyCallbackInfo) {
-    },
-    nil,
-    )
+	varTemplate.SetNamedPropertyHandler(
+		// get
+		func(name string, info v8.PropertyCallbackInfo) {
+			info.ReturnValue().Set(engine.NewNumber(ent.variables[name]))
+		},
+		// set
+		func(name string, value *v8.Value, info v8.PropertyCallbackInfo) {
+			if value.IsNumber() {
+				ent.variables[name] = scripting.NumberFromV8Value(value, ent.variables[name])
+				info.ReturnValue().Set(value)
+			} else {
+				logging.Warning.Println(
+					"Attempted to insert non-numerical value into entity variables")
+			}
+		},
+		// query
+		func(name string, info v8.PropertyCallbackInfo) {
+		},
+		// delete
+		func(name string, info v8.PropertyCallbackInfo) {
+		},
+		// enumerate
+		func(info v8.PropertyCallbackInfo) {
+		},
+		nil,
+	)
 
-  objTemplate := engine.NewObjectTemplate()
-  objTemplate.SetAccessor("vars",
-    // get
-    func(name string, info v8.AccessorCallbackInfo) {
-      info.ReturnValue().Set(engine.NewInstanceOf(varTemplate))
-    },
-    // set
-    func(name string, value *v8.Value, info v8.AccessorCallbackInfo) {
-      logging.Warning.Println("Attempted to overwrite entity.vars")
-    },
-    nil,
-    v8.PA_ReadOnly,
-  )
+	objTemplate := engine.NewObjectTemplate()
+	objTemplate.SetAccessor("vars",
+		// get
+		func(name string, info v8.AccessorCallbackInfo) {
+			info.ReturnValue().Set(engine.NewInstanceOf(varTemplate))
+		},
+		// set
+		func(name string, value *v8.Value, info v8.AccessorCallbackInfo) {
+			logging.Warning.Println("Attempted to overwrite entity.vars")
+		},
+		nil,
+		v8.PA_ReadOnly,
+	)
 
-
-  return objTemplate
+	return objTemplate
 }
-
-
