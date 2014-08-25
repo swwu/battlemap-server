@@ -13,6 +13,7 @@ import (
 func main() {
 
 	logging.Init( /*ioutil.Discard*/ os.Stdout, os.Stdout, os.Stdout, os.Stderr)
+	fmt.Println("HELLO")
 
 	rules := ruleset.NewRuleset()
 	rules.ReadData("data/test_data")
@@ -23,6 +24,10 @@ func main() {
 	a.AddEffect(rules.Effects()["statMods"])
 	a.Recalculate()
 
-	fmt.Println(a)
+	vc := a.VariableContext()
 
+	fmt.Println(a)
+	fmt.Println(vc)
+	fmt.Println(vc.Variable("STR"))
+	fmt.Println(vc.Variable("STR.MOD"))
 }

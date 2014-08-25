@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/swwu/battlemap-server/logging"
 )
 
 func consumeValue(data []byte, atEOF bool) (int, []byte, error) {
@@ -110,4 +112,12 @@ func ParseDiceExpression(expr string) (DiceExpression, error) {
 	} else {
 		return NewAdditionExpression(sumRemaining, sumLiteral), nil
 	}
+}
+
+func EvalDice(expr string) int {
+	expr, err := ParseDiceExpression(string)
+	if err != nil {
+		logging.Warning.Println("Error evaluating dice expression:", expr)
+	}
+	return expr.Eval()
 }

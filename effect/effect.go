@@ -72,39 +72,3 @@ func (eff *scriptEffect) OnEffect(ent V8AccessorProvider) {
 	<-cbChan
 
 }
-
-/*
- * Functions for loading scriptEffects from ,js files
- */
-
-func GenerateScriptEffect(defaultId string, script []byte, effs []Effect,
-	cb func(effs []Effect) error) {
-	engine := scripting.GetEngine()
-	global := engine.NewObjectTemplate()
-
-	global.Bind("defineEffect", func(obj *v8.Object) {
-
-		ret := &scriptEffect{
-			id:          defaultId,
-			displayName: "unnamed property",
-			displayType: "none",
-			onEffectFn:  nil,
-		}
-
-		ret.id = scripting.StringFromV8Object(obj, "id", "defaultId")
-		ret.displayName = scripting.StringFromV8Object(obj, "displayName", "unnamed")
-		ret.displayType = scripting.StringFromV8Object(obj, "displayType", "none")
-		ret.onEffectFn = scripting.FnFromV8Object(obj, "onEffect", nil)
-
-		effs = append(effs, ret)
-
-	})
-
-	compiledScript := engine.Compile(script, nil)
-	context := engine.NewContext(global)
-
-	context.Scope(func(cs v8.ContextScope) {
-		cs.Run(compiledScript)
-		cb(effs)
-	})
-}

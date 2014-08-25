@@ -18,7 +18,13 @@ define.effect({
 
   onEffect: function(entity) {
     for (var i=0; i<stats.length; i++) {
-      entity.vars[stats[i]] = 18;
+      entity.vars.new({
+        id: stats[i],
+        dependencies: [],
+        onEval: function() {
+          return 18;
+        }
+      })
     }
   }
 });
@@ -31,7 +37,17 @@ define.effect({
 
   onEffect: function(entity) {
     for (var i=0; i<stats.length; i++) {
-      entity.vars[stats[i]+".MOD"] = Math.floor((entity.vars[stats[i]]-10)/2);
+      // wrap the scope in a function so that callbacks reference the correct
+      // value of i
+      (function (stat) {
+        entity.vars.new({
+          id: stat+".MOD",
+          dependencies: [stat],
+          onEval: function(deps) {
+            return Math.floor((deps[stat]-10)/2);
+          }
+        })
+      })(stats[i]);
     }
   }
 })

@@ -61,6 +61,40 @@ func FnFromV8Object(obj *v8.Object, key string, defaultVal *v8.Function) *v8.Fun
 	}
 }
 
+func StringArrFromV8Object(obj *v8.Object, key string, defaultVal []string) []string {
+	if obj.HasProperty(key) {
+		val := obj.GetProperty(key)
+		if val.IsArray() {
+			// define one of each type because *v8.Array doesn't implement
+			// *v8.Object methods
+			arrObj := val.ToObject()
+			arrArr := val.ToArray()
+			strings := []string{}
+
+			for i := 0; i < arrArr.Length(); i++ {
+				el := arrObj.GetElement(i)
+				if !el.IsString() {
+					logging.Warning.Println(
+						"Tried to extract non-string value from array element:", i,
+						"value is", el.ToString())
+					continue
+				}
+				strings = append(strings, el.ToString())
+			}
+			return strings
+		} else {
+			logging.Warning.Println(
+				"Tried to extract function value from non-function field:", key,
+				"value is", val.ToString())
+			return defaultVal
+		}
+	} else {
+		logging.Warning.Println(
+			"Tried to extract function value from empty field:", key)
+		return defaultVal
+	}
+}
+
 func NumberFromV8Value(val *v8.Value, defaultVal float64) float64 {
 	if val.IsNumber() {
 		return val.ToNumber()

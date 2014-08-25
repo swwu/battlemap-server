@@ -6,6 +6,7 @@ import (
 	"github.com/swwu/battlemap-server/effect"
 	"github.com/swwu/battlemap-server/logging"
 	"github.com/swwu/battlemap-server/scripting"
+	"github.com/swwu/battlemap-server/variable"
 )
 
 type Footprint struct {
@@ -17,7 +18,7 @@ type Collider interface {
 
 // an entity is defined by its variables and its effect
 type Entity interface {
-	Variables() map[string]float64
+	VariableContext() variable.VariableContext
 
 	Reset()
 	Calculate()
@@ -31,29 +32,38 @@ type Entity interface {
 }
 
 type entity struct {
-	variables map[string]float64
+	variableContext variable.VariableContext
 
 	effects []effect.Effect
 }
 
 func NewEntity() (ent Entity) {
 	return &entity{
-		variables: map[string]float64{},
-		effects:   []effect.Effect{},
+		variableContext: variable.NewContext(),
+		effects:         []effect.Effect{},
 	}
 }
 
-func (ent *entity) Variables() map[string]float64 {
-	return ent.variables
+func (ent *entity) VariableContext() variable.VariableContext {
+	return ent.variableContext
 }
 
 func (ent *entity) Reset() {
-	ent.variables = map[string]float64{}
+	ent.variableContext = variable.NewContext()
 }
 
 func (ent *entity) Calculate() {
 	for _, eff := range ent.effects {
 		eff.OnEffect(ent)
+	}
+
+	dependencyOrder, err := ent.variableContext.DependencyOrdering()
+	if err != nil {
+		logging.Error.Println(err)
+	}
+
+	for _, variable := range dependencyOrder {
+		variable.OnEval()
 	}
 }
 
@@ -66,37 +76,26 @@ func (ent *entity) AddEffect(eff effect.Effect) {
 	ent.effects = append(ent.effects, eff)
 }
 
+func (ent *entity) variableFromV8Object(obj *v8.Object) (variable.Variable, error) {
+	id := scripting.StringFromV8Object(obj, "id", "")
+
+	dependencies := scripting.StringArrFromV8Object(obj, "dependencies", []string{})
+
+	return ent.variableContext.SetVariable(
+		id,
+		dependencies,
+		scripting.FnFromV8Object(obj, "onEval", nil),
+	)
+}
+
 func (ent *entity) V8Accessor() *v8.ObjectTemplate {
 	engine := scripting.GetEngine()
 
 	varTemplate := engine.NewObjectTemplate()
 
-	varTemplate.SetNamedPropertyHandler(
-		// get
-		func(name string, info v8.PropertyCallbackInfo) {
-			info.ReturnValue().Set(engine.NewNumber(ent.variables[name]))
-		},
-		// set
-		func(name string, value *v8.Value, info v8.PropertyCallbackInfo) {
-			if value.IsNumber() {
-				ent.variables[name] = scripting.NumberFromV8Value(value, ent.variables[name])
-				info.ReturnValue().Set(value)
-			} else {
-				logging.Warning.Println(
-					"Attempted to insert non-numerical value into entity variables")
-			}
-		},
-		// query
-		func(name string, info v8.PropertyCallbackInfo) {
-		},
-		// delete
-		func(name string, info v8.PropertyCallbackInfo) {
-		},
-		// enumerate
-		func(info v8.PropertyCallbackInfo) {
-		},
-		nil,
-	)
+	varTemplate.Bind("new", func(obj *v8.Object) {
+		ent.variableFromV8Object(obj)
+	})
 
 	objTemplate := engine.NewObjectTemplate()
 	objTemplate.SetAccessor("vars",

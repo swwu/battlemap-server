@@ -80,6 +80,7 @@ func (rs *ruleset) constructGlobalContext() {
 
 	global := engine.NewObjectTemplate()
 
+	// define namespace is used to define effects etc
 	defineTemplate := engine.NewObjectTemplate()
 	defineTemplate.Bind("effect", func(obj *v8.Object) {
 		newEff := effect.NewScriptEffect(
@@ -88,7 +89,6 @@ func (rs *ruleset) constructGlobalContext() {
 			scripting.StringFromV8Object(obj, "displayType", "none"),
 			scripting.FnFromV8Object(obj, "onEffect", nil),
 		)
-
 		// TODO: check for id collision
 		rs.effects[newEff.Id()] = newEff
 	})
@@ -99,12 +99,10 @@ func (rs *ruleset) constructGlobalContext() {
 		//scripting.StringFromV8Object(obj, "displayType", "none"),
 		//scripting.FnFromV8Object(obj, "onEffect", nil),
 		)
-
 		// TODO: check for id collision
 		//rs.effects[newEff.Id()] = newEff
 		logging.Trace.Println(newAction)
 	})
-
 	global.SetAccessor("define",
 		// get
 		func(name string, info v8.AccessorCallbackInfo) {
@@ -112,7 +110,32 @@ func (rs *ruleset) constructGlobalContext() {
 		},
 		// set - shouldn't ever be called because readonly
 		func(name string, value *v8.Value, info v8.AccessorCallbackInfo) {
-			logging.Warning.Println("Attempted to overwrite entity.vars")
+			logging.Warning.Println("Attempted to overwrite global.define")
+		},
+		nil,
+		v8.PA_ReadOnly,
+	)
+
+	// dice namespace is used to evaluate dice expressions
+	diceTemplate := engine.NewObjectTemplate()
+	diceTemplate.Bind("effect", func(obj *v8.Object) {
+		newEff := effect.NewScriptEffect(
+			scripting.StringFromV8Object(obj, "id", "defaultId"),
+			scripting.StringFromV8Object(obj, "displayName", "unnamed"),
+			scripting.StringFromV8Object(obj, "displayType", "none"),
+			scripting.FnFromV8Object(obj, "onEffect", nil),
+		)
+		// TODO: check for id collision
+		rs.effects[newEff.Id()] = newEff
+	})
+	global.SetAccessor("dice",
+		// get
+		func(name string, info v8.AccessorCallbackInfo) {
+			info.ReturnValue().Set(engine.NewInstanceOf(diceTemplate))
+		},
+		// set - shouldn't ever be called because readonly
+		func(name string, value *v8.Value, info v8.AccessorCallbackInfo) {
+			logging.Warning.Println("Attempted to overwrite global.dice")
 		},
 		nil,
 		v8.PA_ReadOnly,
