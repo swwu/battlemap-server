@@ -10,14 +10,16 @@ type Variable interface {
 	Id() string
 	Context() VariableContext
 	DependencyIds() []string
+	ModifyIds() []string
 	Value() float64
 	OnEval()
 }
 
 type scriptVariable struct {
 	id            string
-	context       VariableContext
+	context       *variableContext
 	dependencyIds []string
+	modifyIds     []string
 	onEvalFn      *v8.Function
 	value         float64
 }
@@ -32,6 +34,10 @@ func (sv *scriptVariable) Context() VariableContext {
 
 func (sv *scriptVariable) DependencyIds() []string {
 	return sv.dependencyIds
+}
+
+func (sv *scriptVariable) ModifyIds() []string {
+	return sv.modifyIds
 }
 
 func (sv *scriptVariable) Value() float64 {
@@ -51,8 +57,9 @@ func (sv *scriptVariable) OnEval() {
 	var retVal float64
 	cbChan := make(chan int)
 	go context.Scope(func(cs v8.ContextScope) {
+
+		// dependency object is {<dependencyId>: <value>}
 		depObj := engine.NewObject()
-		// pass the function the object {<dependencyId>: <value>}
 		for _, depName := range sv.dependencyIds {
 			depVar := sv.Context().Variable(depName)
 			var val *v8.Value
@@ -63,10 +70,70 @@ func (sv *scriptVariable) OnEval() {
 			}
 			depObj.ToObject().SetProperty(depName, val, v8.PA_ReadOnly)
 		}
-		retVal = scripting.NumberFromV8Value(sv.onEvalFn.Call(depObj), 0)
+
+		// modify object is {<modifyId>:func(accumulate_value)}
+		modObjTemplate := engine.NewObjectTemplate()
+		for _, modifyId := range sv.modifyIds {
+			modVar := sv.context.accumVariables[modifyId]
+
+			modObjTemplate.Bind(modifyId, func(val float64) {
+				modVar.Accum(val)
+			})
+		}
+		modObj := engine.NewInstanceOf(modObjTemplate)
+
+		retVal = scripting.NumberFromV8Value(sv.onEvalFn.Call(depObj, modObj), 0)
 
 		cbChan <- 1
 	})
 	<-cbChan
 	sv.value = retVal
+}
+
+type accumVariable struct {
+	id            string
+	context       VariableContext
+	value         float64
+	init          float64
+	dependencyIds []string
+	accumFn       func(float64, float64) float64
+}
+
+func (av *accumVariable) Id() string {
+	return av.id
+}
+
+func (av *accumVariable) Context() VariableContext {
+	return av.context
+}
+
+func (av *accumVariable) DependencyIds() []string {
+	return av.dependencyIds
+}
+
+func (av *accumVariable) ModifyIds() []string {
+	return []string{} // accumulators don't modify things
+}
+
+func (av *accumVariable) Value() float64 {
+	return av.value
+}
+
+func (av *accumVariable) OnEval() {
+}
+
+func (av *accumVariable) Accum(more float64) {
+	av.value = av.accumFn(av.value, more)
+}
+
+func addAccumFn(a float64, b float64) float64 {
+	return a + b
+}
+
+func maxAccumFn(a float64, b float64) float64 {
+	if a > b {
+		return a
+	} else {
+		return b
+	}
 }

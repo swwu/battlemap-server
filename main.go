@@ -21,13 +21,18 @@ func main() {
 	a := entity.NewEntity()
 
 	a.AddEffect(rules.Effects()["baseStats"])
-	a.AddEffect(rules.Effects()["statMods"])
+	a.AddEffect(rules.Effects()["baseEntityRules"])
+	a.AddEffect(rules.Effects()["fighterClass"])
 	a.Recalculate()
 
 	vc := a.VariableContext()
 
-	fmt.Println(a)
 	fmt.Println(vc)
-	fmt.Println(vc.Variable("STR"))
-	fmt.Println(vc.Variable("STR.MOD"))
+
+	vals := []string{"fighter_lvl", "bab", "will_save", "fort_save", "ref_save"}
+	fmt.Println(vc.Variable("str"))
+	fmt.Println(vc.Variable("str_mod"))
+	for _, val := range vals {
+		fmt.Println(val, "-", vc.Variable(val).Value())
+	}
 }

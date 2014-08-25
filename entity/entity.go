@@ -77,14 +77,19 @@ func (ent *entity) AddEffect(eff effect.Effect) {
 }
 
 func (ent *entity) variableFromV8Object(obj *v8.Object) (variable.Variable, error) {
-	id := scripting.StringFromV8Object(obj, "id", "")
-
-	dependencies := scripting.StringArrFromV8Object(obj, "dependencies", []string{})
-
 	return ent.variableContext.SetVariable(
-		id,
-		dependencies,
+		scripting.StringFromV8Object(obj, "id", ""),
+		scripting.StringArrFromV8Object(obj, "dependencies", []string{}),
+		scripting.StringArrFromV8Object(obj, "modifies", []string{}),
 		scripting.FnFromV8Object(obj, "onEval", nil),
+	)
+}
+
+func (ent *entity) accumVariableFromV8Object(obj *v8.Object) (variable.Variable, error) {
+	return ent.variableContext.SetAccumVariable(
+		scripting.StringFromV8Object(obj, "id", ""),
+		scripting.StringFromV8Object(obj, "op", "+"), // default operation is add
+		scripting.NumberFromV8Object(obj, "init", 0), // default value is 0
 	)
 }
 
@@ -95,6 +100,14 @@ func (ent *entity) V8Accessor() *v8.ObjectTemplate {
 
 	varTemplate.Bind("new", func(obj *v8.Object) {
 		ent.variableFromV8Object(obj)
+	})
+	// a proxy is a variable whose purpose is to modify other variables
+	varTemplate.Bind("newProxy", func(obj *v8.Object) {
+		ent.variableFromV8Object(obj)
+	})
+
+	varTemplate.Bind("newAccum", func(obj *v8.Object) {
+		ent.accumVariableFromV8Object(obj)
 	})
 
 	objTemplate := engine.NewObjectTemplate()

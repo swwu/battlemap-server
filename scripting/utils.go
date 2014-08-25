@@ -84,13 +84,13 @@ func StringArrFromV8Object(obj *v8.Object, key string, defaultVal []string) []st
 			return strings
 		} else {
 			logging.Warning.Println(
-				"Tried to extract function value from non-function field:", key,
+				"Tried to extract array value from non-array field:", key,
 				"value is", val.ToString())
 			return defaultVal
 		}
 	} else {
-		logging.Warning.Println(
-			"Tried to extract function value from empty field:", key)
+		//logging.Warning.Println(
+		//	"Tried to extract array value from empty field:", key)
 		return defaultVal
 	}
 }
