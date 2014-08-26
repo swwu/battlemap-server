@@ -27,11 +27,9 @@ func main() {
 
 	vc := a.VariableContext()
 
-	fmt.Println(vc)
-
-	vals := []string{"fighter_lvl", "bab", "will_save", "fort_save", "ref_save"}
-	fmt.Println(vc.Variable("str"))
-	fmt.Println(vc.Variable("str_mod"))
+	vals := []string{"str", "str_mod", "fighter_lvl", "bab", "will_save",
+		"will_save_insight_bonus", "will_save_untyped_bonus", "fort_save",
+		"ref_save", "hp"}
 	for _, val := range vals {
 		fmt.Println(val, "-", vc.Variable(val).Value())
 	}

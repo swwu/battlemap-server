@@ -79,7 +79,7 @@ func (ent *entity) AddEffect(eff effect.Effect) {
 func (ent *entity) variableFromV8Object(obj *v8.Object) (variable.Variable, error) {
 	return ent.variableContext.SetVariable(
 		scripting.StringFromV8Object(obj, "id", ""),
-		scripting.StringArrFromV8Object(obj, "dependencies", []string{}),
+		scripting.StringArrFromV8Object(obj, "depends", []string{}),
 		scripting.StringArrFromV8Object(obj, "modifies", []string{}),
 		scripting.FnFromV8Object(obj, "onEval", nil),
 	)
@@ -97,7 +97,6 @@ func (ent *entity) V8Accessor() *v8.ObjectTemplate {
 	engine := scripting.GetEngine()
 
 	varTemplate := engine.NewObjectTemplate()
-
 	varTemplate.Bind("new", func(obj *v8.Object) {
 		ent.variableFromV8Object(obj)
 	})
@@ -105,9 +104,12 @@ func (ent *entity) V8Accessor() *v8.ObjectTemplate {
 	varTemplate.Bind("newProxy", func(obj *v8.Object) {
 		ent.variableFromV8Object(obj)
 	})
-
 	varTemplate.Bind("newAccum", func(obj *v8.Object) {
 		ent.accumVariableFromV8Object(obj)
+	})
+
+	labelTemplate := engine.NewObjectTemplate()
+	labelTemplate.Bind("new", func(fn *v8.Function) {
 	})
 
 	objTemplate := engine.NewObjectTemplate()
@@ -119,6 +121,18 @@ func (ent *entity) V8Accessor() *v8.ObjectTemplate {
 		// set
 		func(name string, value *v8.Value, info v8.AccessorCallbackInfo) {
 			logging.Warning.Println("Attempted to overwrite entity.vars")
+		},
+		nil,
+		v8.PA_ReadOnly,
+	)
+	objTemplate.SetAccessor("labels",
+		// get
+		func(name string, info v8.AccessorCallbackInfo) {
+			info.ReturnValue().Set(engine.NewInstanceOf(labelTemplate))
+		},
+		// set
+		func(name string, value *v8.Value, info v8.AccessorCallbackInfo) {
+			logging.Warning.Println("Attempted to overwrite entity.labels")
 		},
 		nil,
 		v8.PA_ReadOnly,
