@@ -34,6 +34,12 @@ func NewRuleset() Ruleset {
 	return ret
 }
 
+func NewRulesetFromData(path string) Ruleset {
+	ret := NewRuleset()
+	ret.ReadData(path)
+	return ret
+}
+
 func (rs *ruleset) Effects() map[string]effect.Effect {
 	return rs.effects
 }
