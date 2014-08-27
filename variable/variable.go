@@ -1,6 +1,8 @@
 package variable
 
 import (
+	"fmt"
+
 	"github.com/swwu/v8.go"
 
 	"github.com/swwu/battlemap-server/scripting"
@@ -120,6 +122,8 @@ func (av *accumVariable) Value() float64 {
 }
 
 func (av *accumVariable) OnEval() {
+	fmt.Println(av.init)
+	av.value = av.accumFn(av.value, av.init)
 }
 
 func (av *accumVariable) Accum(more float64) {
