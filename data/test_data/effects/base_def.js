@@ -57,25 +57,6 @@ var sumBonuses = function(deps, stat_name, exclude) {
   },0);
 }
 
-
-define.effect({
-  id: "baseStats",
-  displayName: "Base Stats",
-  displayType: "base",
-
-  onEffect: function(entity) {
-    entity.vars.new({
-      id:"base_stats_proxy",
-      modifies: ability_scores.map(function(score){return score+"_base";}),
-      onEval: function(deps, mods) {
-        for (var i=0; i<ability_scores.length; i++) {
-          mods[ability_scores[i]+"_base"](14);
-        }
-      }
-    })
-  }
-});
-
 define.effect({
   id: "baseEntityRules",
   displayName: "Base Rule Calculations",
@@ -151,7 +132,7 @@ define.effect({
       }
     });
     entity.vars.new({
-      id: "ab_proxy",
+      id: "ab_stat_proxy",
       depends: ["str_mod", "dex_mod"],
       modifies: ["melee_ab_stat_bonus", "ranged_ab_stat_bonus"],
       onEval: function(deps, mods) {
@@ -159,6 +140,60 @@ define.effect({
         mods.ranged_ab_stat_bonus(deps.dex_mod);
       }
     })
+
+    generateBonusAccums(entity,"cmb");
+    entity.vars.newAccum({id: "cmb_stat_bonus", op: "max", init: 0 });
+    entity.vars.new({
+      id: "cmb",
+      depends: ["bab", "cmb_stat_bonus"].concat(generateBonusNames("cmb")),
+      onEval: function(deps) {
+        return deps.bab + deps.cmb_stat_bonus + sumBonuses(deps, "cmb");
+      }
+    });
+
+    generateBonusAccums(entity,"cmd");
+    entity.vars.newAccum({id: "cmd_stat_bonus1", op: "max", init: 0 });
+    entity.vars.newAccum({id: "cmd_stat_bonus2", op: "max", init: 0 });
+    entity.vars.new({
+      id: "cmd",
+      depends: ["bab", "cmd_stat_bonus1", "cmd_stat_bonus2"].concat(generateBonusNames("cmd")),
+      onEval: function(deps) {
+        return 10 + deps.bab + deps.cmd_stat_bonus1 + deps.cmd_stat_bonus2 + sumBonuses(deps, "cmd");
+      }
+    });
+    entity.vars.new({
+      id: "cm_stat_proxy",
+      depends: ["str_mod", "dex_mod"],
+      modifies: ["cmb_stat_bonus", "cmd_stat_bonus1", "cmd_stat_bonus2"],
+      onEval: function(deps, mods) {
+        mods.cmb_stat_bonus(deps.str_mod);
+        mods.cmd_stat_bonus1(deps.str_mod);
+        mods.cmd_stat_bonus2(deps.dex_mod);
+      }
+    });
+    var cmTypes = ["bullrush", "dirtytrick", "disarm", "drag", "grapple",
+        "overrun", "reposition", "steal", "sunder", "trip"];
+    cmTypes.map(function(cmType) {
+      var cmbName = "cmb_" + cmType;
+      var cmdName = "cmd_" + cmType;
+      generateBonusAccums(entity,cmbName);
+      generateBonusAccums(entity,cmdName);
+      entity.vars.new({
+        id: cmbName,
+        depends: ["cmb"].concat(generateBonusNames(cmbName)),
+        onEval: function(deps) {
+          return deps.cmb + sumBonuses(deps, cmbName);
+        }
+      })
+      entity.vars.new({
+        id: cmdName,
+        depends: ["cmd"].concat(generateBonusNames(cmbName)),
+        onEval: function(deps) {
+          return deps.cmd + sumBonuses(deps, cmdName);
+        }
+      })
+    });
+
 
     // ac
     entity.vars.newAccum({
@@ -194,7 +229,7 @@ define.effect({
       }
     })
     entity.vars.new({
-      id: "ac_proxy",
+      id: "ac_stat_proxy",
       depends: ["dex_mod"],
       modifies: ["ac_stat_bonus"],
       onEval: function(deps, mods) {
@@ -247,15 +282,73 @@ define.effect({
       }
     })
 
+    // movement
+    entity.vars.newAccum({
+      id: "walk_speed_base",
+      op: "+",
+      init: 30
+    });
+    generateBonusAccums(entity,"walk_speed");
+    entity.vars.new({
+      id: "walk_speed",
+      depends: ["walk_speed_base"].concat(generateBonusNames("walk_speed")),
+      onEval: function(deps) {
+        return deps.walk_speed_base + sumBonuses(deps, "walk_speed");
+      }
+    })
+    entity.vars.newAccum({
+      id: "swim_speed_base",
+      op: "+",
+      init: 0
+    })
+    generateBonusAccums(entity,"swim_speed");
+    entity.vars.new({
+      id: "swim_speed",
+      depends: ["swim_speed_base"].concat(generateBonusNames("swim_speed")),
+      onEval: function(deps) {
+        return deps.swim_speed_base + sumBonuses(deps, "swim_speed");
+      }
+    })
+    entity.vars.newAccum({
+      id: "climb_speed_base",
+      op: "+",
+      init: 0
+    })
+    generateBonusAccums(entity,"climb_speed");
+    entity.vars.new({
+      id: "climb_speed",
+      depends: ["climb_speed_base"].concat(generateBonusNames("climb_speed")),
+      onEval: function(deps) {
+        return deps.climb_speed_base + sumBonuses(deps, "climb_speed");
+      }
+    })
+    entity.vars.newAccum({
+      id: "fly_speed_base",
+      op: "+",
+      init: 0
+    })
+    generateBonusAccums(entity,"fly_speed");
+    entity.vars.new({
+      id: "fly_speed",
+      depends: ["fly_speed_base"].concat(generateBonusNames("fly_speed")),
+      onEval: function(deps) {
+        return deps.fly_speed_base + sumBonuses(deps, "fly_speed");
+      }
+    })
+
+
     // testing stuff
     entity.vars.new({
       id: "test_proxy_1",
-      modifies: ["fighter_lvl","will_save_insight_bonus","will_save_untyped_bonus"],
+      modifies: ["fighter_lvl","will_save_insight_bonus","will_save_untyped_bonus","cmb_trip_untyped_bonus"],
       onEval: function(deps,mods) {
         mods.will_save_insight_bonus(1);
         mods.will_save_insight_bonus(2);
         mods.will_save_untyped_bonus(1);
         mods.will_save_untyped_bonus(2);
+
+        mods.cmb_trip_untyped_bonus(4);
+
         mods.fighter_lvl(10);
       }
     })

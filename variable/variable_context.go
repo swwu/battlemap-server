@@ -10,7 +10,9 @@ import (
 // to guarantee consistency of variable evaluations.
 type VariableContext interface {
 	Variable(id string) Variable
-	SetVariable(id string, dependencies []string,
+	AccumVariable(id string) AccumVariable
+	SetLiteralVariable(id string, value float64)
+	SetScriptVariable(id string, dependencies []string,
 		modifies []string, onEvalFn *v8.Function) (Variable, error)
 	SetAccumVariable(id string, op string, init float64) (Variable, error)
 
@@ -19,20 +21,29 @@ type VariableContext interface {
 }
 
 type variableContext struct {
-	variables      map[string]Variable
-	accumVariables map[string]*accumVariable
+	// all variables ever go here, even if they also go in other places
+	variables map[string]Variable
+
+	// accums need to be tracked separately to track modification correctness
+	accumVariables map[string]AccumVariable
+
+	// literal values that are accumulated onto accumulators before any other
+	// eval is done
 }
 
 func NewContext() VariableContext {
 	return &variableContext{
 		variables:      map[string]Variable{},
-		accumVariables: map[string]*accumVariable{},
+		accumVariables: map[string]AccumVariable{},
 	}
+}
+
+func (vc *variableContext) SetLiteralVariable(id string, value float64) {
 }
 
 // Creates a new variable. Variables are immutable but can be changed by
 // modifying accumulators on which they depend
-func (vc *variableContext) SetVariable(id string, dependencyIds []string,
+func (vc *variableContext) SetScriptVariable(id string, dependencyIds []string,
 	modifyIds []string, onEvalFn *v8.Function) (Variable, error) {
 	if _, exists := vc.variables[id]; exists {
 		return nil, fmt.Errorf("Variable with id", id, "already exists")
@@ -76,17 +87,21 @@ func (vc *variableContext) Variable(id string) Variable {
 	return vc.variables[id]
 }
 
+func (vc *variableContext) AccumVariable(id string) AccumVariable {
+	return vc.accumVariables[id]
+}
+
 // Performs a topological sort on all the variables in the context
 func (vc *variableContext) DependencyOrdering() ([]Variable, error) {
 	// first, reset and regenerate dependencies for accumulators based on
 	// modifyIds
 	for _, accumVar := range vc.accumVariables {
-		accumVar.dependencyIds = []string{}
+		accumVar.SetDependencyIds([]string{})
 	}
 	for _, variable := range vc.variables {
 		for _, modifyId := range variable.ModifyIds() {
 			if modifyVar, exists := vc.accumVariables[modifyId]; exists {
-				modifyVar.dependencyIds = append(modifyVar.dependencyIds, variable.Id())
+				modifyVar.SetDependencyIds(append(modifyVar.DependencyIds(), variable.Id()))
 			} else {
 				return nil, fmt.Errorf("No accumulator with id %v", modifyId)
 			}

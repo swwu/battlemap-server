@@ -20,6 +20,8 @@ type Collider interface {
 type Entity interface {
 	VariableContext() variable.VariableContext
 
+	BaseValues() map[string]float64
+
 	Reset()
 	Calculate()
 	Recalculate()
@@ -34,12 +36,23 @@ type Entity interface {
 type entity struct {
 	variableContext variable.VariableContext
 
+	baseValues map[string]float64
+
 	effects []effect.Effect
 }
 
-func NewEntity() (ent Entity) {
+func NewEntity() Entity {
 	return &entity{
 		variableContext: variable.NewContext(),
+		baseValues:      map[string]float64{},
+		effects:         []effect.Effect{},
+	}
+}
+
+func NewEntityWithValues(baseValues map[string]float64) Entity {
+	return &entity{
+		variableContext: variable.NewContext(),
+		baseValues:      baseValues,
 		effects:         []effect.Effect{},
 	}
 }
@@ -48,20 +61,34 @@ func (ent *entity) VariableContext() variable.VariableContext {
 	return ent.variableContext
 }
 
+func (ent *entity) BaseValues() map[string]float64 {
+	return ent.baseValues
+}
+
 func (ent *entity) Reset() {
 	ent.variableContext = variable.NewContext()
 }
 
 func (ent *entity) Calculate() {
+	// evaluate all effects to instantiate variables
 	for _, eff := range ent.effects {
 		eff.OnEffect(ent)
 	}
 
+	// apply base values
+	for valueVar, baseValue := range ent.baseValues {
+		if accum := ent.variableContext.AccumVariable(valueVar); accum != nil {
+			accum.Accum(baseValue)
+		} else {
+			logging.Warning.Println("Entity base value was not an accumulator")
+		}
+	}
+
+	// evaluate all variable nodes in dependency order
 	dependencyOrder, err := ent.variableContext.DependencyOrdering()
 	if err != nil {
 		logging.Error.Println(err)
 	}
-
 	for _, variable := range dependencyOrder {
 		variable.OnEval()
 	}
@@ -77,7 +104,7 @@ func (ent *entity) AddEffect(eff effect.Effect) {
 }
 
 func (ent *entity) variableFromV8Object(obj *v8.Object) (variable.Variable, error) {
-	return ent.variableContext.SetVariable(
+	return ent.variableContext.SetScriptVariable(
 		scripting.StringFromV8Object(obj, "id", ""),
 		scripting.StringArrFromV8Object(obj, "depends", []string{}),
 		scripting.StringArrFromV8Object(obj, "modifies", []string{}),

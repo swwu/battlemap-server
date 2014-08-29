@@ -25,18 +25,26 @@ func main() {
 
 	rules := rulesets["test"]
 
-	ent := entity.NewEntity()
+	ent := entity.NewEntityWithValues(map[string]float64{
+		"str_base": 14,
+		"dex_base": 14,
+		"con_base": 14,
+		"int_base": 14,
+		"wis_base": 14,
+		"cha_base": 14,
+	})
 
-	ent.AddEffect(rules.Effects()["baseStats"])
 	ent.AddEffect(rules.Effects()["baseEntityRules"])
 	ent.AddEffect(rules.Effects()["fighterClass"])
 	ent.Recalculate()
 
 	vc := ent.VariableContext()
 
-	vals := []string{"str", "str_mod", "dex", "dex_mod", "fighter_lvl", "bab", "melee_ab", "will_save",
-		"will_save_insight_bonus", "will_save_untyped_bonus", "fort_save",
-		"ref_save", "ac_base", "ac_stat_bonus", "ac", "ac_touch", "ac_flatfooted", "hp"}
+	vals := []string{"str", "str_mod", "dex", "dex_mod", "fighter_lvl", "bab",
+		"melee_ab", "will_save", "will_save_insight_bonus",
+		"will_save_untyped_bonus", "fort_save", "ref_save", "ac_base",
+		"ac_stat_bonus", "ac", "ac_touch", "ac_flatfooted", "cmb", "cmd",
+		"cmb_trip", "cmb_grapple", "hp"}
 	for _, val := range vals {
 		fmt.Println(val, "-", vc.Variable(val).Value())
 	}

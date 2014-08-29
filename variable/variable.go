@@ -1,8 +1,6 @@
 package variable
 
 import (
-	"fmt"
-
 	"github.com/swwu/v8.go"
 
 	"github.com/swwu/battlemap-server/scripting"
@@ -92,6 +90,12 @@ func (sv *scriptVariable) OnEval() {
 	sv.value = retVal
 }
 
+type AccumVariable interface {
+	Variable
+	SetDependencyIds(deps []string)
+	Accum(more float64)
+}
+
 type accumVariable struct {
 	id            string
 	context       VariableContext
@@ -113,6 +117,10 @@ func (av *accumVariable) DependencyIds() []string {
 	return av.dependencyIds
 }
 
+func (av *accumVariable) SetDependencyIds(ids []string) {
+	av.dependencyIds = ids
+}
+
 func (av *accumVariable) ModifyIds() []string {
 	return []string{} // accumulators don't modify things
 }
@@ -122,7 +130,6 @@ func (av *accumVariable) Value() float64 {
 }
 
 func (av *accumVariable) OnEval() {
-	fmt.Println(av.init)
 	av.value = av.accumFn(av.value, av.init)
 }
 
