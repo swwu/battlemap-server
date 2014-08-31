@@ -44,6 +44,11 @@ func Serve(gamespaces map[string]Gamespace,
 			})
 		}).Methods("GET")
 
+	router.HandleFunc("/gamespace/{gamespace_id}",
+		func(w http.ResponseWriter, r *http.Request) {
+			// TODO: update baseValues
+		}).Methods("POST", "PUT")
+
 	router.HandleFunc("/gamespace/{gamespace_id}/entity",
 		func(w http.ResponseWriter, r *http.Request) {
 			gid := mux.Vars(r)["gamespace_id"]

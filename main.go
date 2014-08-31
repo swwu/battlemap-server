@@ -26,12 +26,13 @@ func main() {
 	rules := rulesets["test"]
 
 	ent := entity.NewEntityWithValues(map[string]float64{
-		"str_base": 14,
-		"dex_base": 14,
-		"con_base": 14,
-		"int_base": 14,
-		"wis_base": 14,
-		"cha_base": 14,
+		"str_base":    14,
+		"dex_base":    14,
+		"con_base":    14,
+		"int_base":    14,
+		"wis_base":    14,
+		"cha_base":    14,
+		"fighter_lvl": 10,
 	})
 
 	ent.AddEffect(rules.Effects()["baseEntityRules"])

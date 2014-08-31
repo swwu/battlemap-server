@@ -59,9 +59,10 @@ var sumBonuses = function(deps, stat_name, exclude) {
 
 define.effect({
   id: "baseEntityRules",
-  displayName: "Base Rule Calculations",
-  displayType: "base",
-
+  tags: ["base"],
+  displayString: function(entityVars) {
+    return "base effects";
+  },
   onEffect: function(entity) {
     // ability scores
     for (var i=0; i<ability_scores.length; i++) {
@@ -238,9 +239,6 @@ define.effect({
     })
 
 
-
-
-
     // saves
     entity.vars.newAccum({
       id: "will_save_base",
@@ -253,6 +251,18 @@ define.effect({
       depends: ["will_save_base","wis_mod"].concat(generateBonusNames("will_save")),
       onEval: function(deps) {
         return deps.will_save_base + deps.wis_mod + sumBonuses(deps, "will_save");
+      }
+    })
+    entity.vars.newAccum({
+      id: "will_save_fear_bonus",
+      op: "+",
+      init: 0
+    });
+    entity.vars.new({
+      id: "will_save_fear",
+      depends: ["will_save", "will_save_fear_bonus"],
+      onEval: function(deps) {
+        return deps.will_save + deps.will_save_fear_bonus
       }
     })
     entity.vars.newAccum({
@@ -349,7 +359,6 @@ define.effect({
 
         mods.cmb_trip_untyped_bonus(4);
 
-        mods.fighter_lvl(10);
       }
     })
   }

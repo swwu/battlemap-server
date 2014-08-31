@@ -120,6 +120,10 @@ func (ent *entity) accumVariableFromV8Object(obj *v8.Object) (variable.Variable,
 	)
 }
 
+func (ent *entity) V8VariableAccessor() *v8.ObjectTemplate {
+	return nil
+}
+
 func (ent *entity) V8Accessor() *v8.ObjectTemplate {
 	engine := scripting.GetEngine()
 
