@@ -14,7 +14,7 @@ import (
 
 func Serve(gamespaces map[string]Gamespace,
 	rulesets map[string]ruleset.Ruleset) {
-	logging.Info.Println("Serving on :8080")
+	logging.Info.Println("Serving on :10010")
 	upgrader := websocket.Upgrader{
 		ReadBufferSize:  1024,
 		WriteBufferSize: 1024,
@@ -63,7 +63,14 @@ func Serve(gamespaces map[string]Gamespace,
 			gid := mux.Vars(r)["gamespace_id"]
 			eid := mux.Vars(r)["entity_id"]
 			checkGamespace(gid, w, func() {
-				fmt.Fprintf(w, "Gamespace: %q exists, entity %q", html.EscapeString(gid), html.EscapeString(eid))
+				jsonDump, err := gamespaces[gid].Entity(eid).VariableContext().JsonDump()
+				w.Header().Set("Access-Control-Allow-Origin", "*")
+				if err != nil {
+					fmt.Fprintf(w, "some kind of error")
+				} else {
+					fmt.Fprintf(w, string(jsonDump))
+				}
+				//w.Write(jsonDump)
 			})
 		}).Methods("GET")
 
@@ -74,5 +81,5 @@ func Serve(gamespaces map[string]Gamespace,
 		})
 	http.Handle("/", router)
 
-	http.ListenAndServe(":8080", nil)
+	http.ListenAndServe(":10010", nil)
 }

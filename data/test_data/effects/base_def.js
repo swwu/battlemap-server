@@ -188,7 +188,7 @@ define.effect({
       })
       entity.vars.new({
         id: cmdName,
-        depends: ["cmd"].concat(generateBonusNames(cmbName)),
+        depends: ["cmd"].concat(generateBonusNames(cmdName)),
         onEval: function(deps) {
           return deps.cmd + sumBonuses(deps, cmdName);
         }

@@ -7,6 +7,15 @@ import (
 )
 
 /*
+ * Effect groups are groupings of effects that are all required to produce a
+ * certain gameplay mechanic (e.g. a class + its class abilities)
+ */
+type EffectGroup interface {
+	Id() string
+	Effects() []Effect
+}
+
+/*
  * Effects mutate the state of entities and are persistent
  */
 type Effect interface {

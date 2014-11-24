@@ -50,5 +50,7 @@ func main() {
 		fmt.Println(val, "-", vc.Variable(val).Value())
 	}
 
+	gamespaces["testspace"].SetEntity("test", ent)
+
 	server.Serve(gamespaces, rulesets)
 }

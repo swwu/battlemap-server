@@ -7,6 +7,7 @@ import (
 
 type Gamespace interface {
 	Entity(id string) entity.Entity
+	SetEntity(id string, entity entity.Entity)
 	Ruleset() ruleset.Ruleset
 }
 
@@ -24,6 +25,10 @@ func NewGamespace(ruleset ruleset.Ruleset) Gamespace {
 
 func (gs *gamespace) Entity(id string) entity.Entity {
 	return gs.entities[id]
+}
+
+func (gs *gamespace) SetEntity(id string, entity entity.Entity) {
+	gs.entities[id] = entity
 }
 
 func (gs *gamespace) Ruleset() ruleset.Ruleset {

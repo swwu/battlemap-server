@@ -98,6 +98,8 @@ func (rs *ruleset) constructGlobalContext() {
 		// TODO: check for id collision
 		rs.effects[newEff.Id()] = newEff
 	})
+	defineTemplate.Bind("effectGroup", func(obj *v8.Object) {
+	})
 	defineTemplate.Bind("action", func(obj *v8.Object) {
 		newAction := action.NewScriptAction(
 		//scripting.StringFromV8Object(obj, "id", "defaultId"),
@@ -124,15 +126,7 @@ func (rs *ruleset) constructGlobalContext() {
 
 	// dice namespace is used to evaluate dice expressions
 	diceTemplate := engine.NewObjectTemplate()
-	diceTemplate.Bind("effect", func(obj *v8.Object) {
-		newEff := effect.NewScriptEffect(
-			scripting.StringFromV8Object(obj, "id", "defaultId"),
-			scripting.StringFromV8Object(obj, "displayName", "unnamed"),
-			scripting.StringFromV8Object(obj, "displayType", "none"),
-			scripting.FnFromV8Object(obj, "onEffect", nil),
-		)
-		// TODO: check for id collision
-		rs.effects[newEff.Id()] = newEff
+	diceTemplate.Bind("roll", func(obj *v8.Object) {
 	})
 	global.SetAccessor("dice",
 		// get
