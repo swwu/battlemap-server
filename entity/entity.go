@@ -1,6 +1,10 @@
 package entity
 
 import (
+	"encoding/json"
+	"fmt"
+	"math"
+
 	"github.com/swwu/v8.go"
 
 	"github.com/swwu/battlemap-server/effect"
@@ -31,6 +35,14 @@ type Entity interface {
 	// returns a *v8.Value instead of *v8.Object (since object can't be easily
 	// converted back to value)
 	V8Accessor() *v8.ObjectTemplate
+
+	JsonDump() ([]byte, error)
+}
+
+type entityJson struct {
+	Id      string             `json:"id"`
+	Vars    map[string]float64 `json:"vars"`
+	Effects map[string]bool    `json:"effects"`
 }
 
 type entity struct {
@@ -170,4 +182,24 @@ func (ent *entity) V8Accessor() *v8.ObjectTemplate {
 	)
 
 	return objTemplate
+}
+
+func (ent *entity) JsonDump() ([]byte, error) {
+	jsonStruct := &entityJson{
+		Id:      "test",
+		Vars:    map[string]float64{},
+		Effects: map[string]bool{},
+	}
+	vars := ent.VariableContext().Variables()
+	for k, v := range vars {
+		if !math.IsNaN(v.Value()) {
+			jsonStruct.Vars[k] = v.Value()
+		}
+	}
+	jsonString, err := json.Marshal(jsonStruct)
+	if err != nil {
+		logging.Warning.Println("Error marshaling entity")
+		return nil, fmt.Errorf("Error marshaling entity")
+	}
+	return jsonString, nil
 }

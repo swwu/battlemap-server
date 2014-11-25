@@ -54,17 +54,17 @@ func Serve(gamespaces map[string]Gamespace,
 			gid := mux.Vars(r)["gamespace_id"]
 			eid := mux.Vars(r)["entity_id"]
 			checkGamespace(gid, w, func() {
-				fmt.Fprintf(w, "Gamespace: %q exists, entity %q", html.EscapeString(gid), html.EscapeString(eid))
+				w.Header().Set("Access-Control-Allow-Origin", "*")
 			})
-		}).Methods("POST")
+		}).Methods("POST", "PUT")
 
 	router.HandleFunc("/gamespace/{gamespace_id}/entity/{entity_id}",
 		func(w http.ResponseWriter, r *http.Request) {
 			gid := mux.Vars(r)["gamespace_id"]
 			eid := mux.Vars(r)["entity_id"]
 			checkGamespace(gid, w, func() {
-				jsonDump, err := gamespaces[gid].Entity(eid).VariableContext().JsonDump()
 				w.Header().Set("Access-Control-Allow-Origin", "*")
+				jsonDump, err := gamespaces[gid].Entity(eid).JsonDump()
 				if err != nil {
 					fmt.Fprintf(w, "some kind of error")
 				} else {

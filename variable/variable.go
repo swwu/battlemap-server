@@ -94,6 +94,7 @@ type AccumVariable interface {
 	Variable
 	SetDependencyIds(deps []string)
 	Accum(more float64)
+	Reset()
 }
 
 type accumVariable struct {
@@ -135,6 +136,10 @@ func (av *accumVariable) OnEval() {
 
 func (av *accumVariable) Accum(more float64) {
 	av.value = av.accumFn(av.value, more)
+}
+
+func (av *accumVariable) Reset() {
+	av.value = av.init
 }
 
 func addAccumFn(a float64, b float64) float64 {

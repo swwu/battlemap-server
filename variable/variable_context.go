@@ -1,9 +1,7 @@
 package variable
 
 import (
-	"encoding/json"
 	"fmt"
-	"math"
 
 	"github.com/swwu/v8.go"
 )
@@ -18,9 +16,10 @@ type VariableContext interface {
 		modifies []string, onEvalFn *v8.Function) (Variable, error)
 	SetAccumVariable(id string, op string, init float64) (Variable, error)
 
+	Variables() map[string]Variable
+
 	DependencyOrdering() ([]Variable, error)
 
-	JsonDump() ([]byte, error)
 	//Eval()
 }
 
@@ -162,18 +161,6 @@ func (vc *variableContext) DependencyOrdering() ([]Variable, error) {
 	return sortedList, nil
 }
 
-func (vc *variableContext) JsonDump() ([]byte, error) {
-	marshalVars := map[string]float64{}
-	for k, v := range vc.variables {
-		if !math.IsNaN(v.Value()) {
-			marshalVars[k] = v.Value()
-		}
-	}
-
-	jsonString, err := json.Marshal(marshalVars)
-	if err != nil {
-		fmt.Println(err)
-		return nil, fmt.Errorf("Cannot marshal variable context")
-	}
-	return jsonString, nil
+func (vc *variableContext) Variables() map[string]Variable {
+	return vc.variables
 }
