@@ -33,29 +33,60 @@ func Serve(gamespaces map[string]Gamespace,
 
 	router := mux.NewRouter()
 
+	// Cross domain headers
+	corsHandler := func(fn http.HandlerFunc) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			fmt.Println("hallo")
+			if r.Method == "OPTIONS" {
+				if acrh, ok := r.Header["Access-Control-Request-Headers"]; ok {
+					w.Header().Set("Access-Control-Allow-Headers", acrh[0])
+				}
+				//w.Header().Set("Access-Control-Allow-Credentials", "True")
+				if _, ok := r.Header["Access-Control-Allow-Origin"]; ok {
+					w.Header().Set("Access-Control-Allow-Origin", "*")
+				} else {
+					if _, oko := r.Header["Origin"]; oko {
+						w.Header().Set("Access-Control-Allow-Origin", r.Header["Origin"][0])
+					} else {
+						w.Header().Set("Access-Control-Allow-Origin", "*")
+					}
+				}
+				w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+			} else {
+				fn(w, r)
+			}
+		}
+	}
+
+	router.HandleFunc("/",
+		corsHandler(func(w http.ResponseWriter, r *http.Request) {
+		})).Methods("POST", "OPTIONS")
+
 	router.HandleFunc("/gamespace/",
-		func(w http.ResponseWriter, r *http.Request) {
-		}).Methods("POST")
+		corsHandler(func(w http.ResponseWriter, r *http.Request) {
+		})).Methods("POST", "OPTIONS")
 
 	router.HandleFunc("/gamespace/{gamespace_id}",
-		func(w http.ResponseWriter, r *http.Request) {
+		corsHandler(func(w http.ResponseWriter, r *http.Request) {
 			id := mux.Vars(r)["gamespace_id"]
 			checkGamespace(id, w, func() {
 				fmt.Fprintf(w, "Gamespace: %q exists", html.EscapeString(id))
 			})
-		}).Methods("GET")
+		})).Methods("GET", "OPTIONS")
 
 	router.HandleFunc("/gamespace/{gamespace_id}",
-		func(w http.ResponseWriter, r *http.Request) {
+		corsHandler(func(w http.ResponseWriter, r *http.Request) {
 			// TODO: update baseValues
-		}).Methods("POST", "PUT")
+		})).Methods("POST", "PUT", "OPTIONS")
 
 	router.HandleFunc("/gamespace/{gamespace_id}/entity",
-		func(w http.ResponseWriter, r *http.Request) {
+		corsHandler(func(w http.ResponseWriter, r *http.Request) {
+			fmt.Println("hallo postput")
 			gid := mux.Vars(r)["gamespace_id"]
 			eid := mux.Vars(r)["entity_id"]
 			checkGamespace(gid, w, func() {
 				w.Header().Set("Access-Control-Allow-Origin", "*")
+				w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE")
 				bodyText, err := ioutil.ReadAll(r.Body)
 				if err != nil {
 					fmt.Fprintf(w, "some kind of error")
@@ -63,14 +94,16 @@ func Serve(gamespaces map[string]Gamespace,
 					gamespaces[gid].Entity(eid).JsonPut(bodyText)
 				}
 			})
-		}).Methods("POST", "PUT")
+		})).Methods("POST", "PUT", "OPTIONS")
 
 	router.HandleFunc("/gamespace/{gamespace_id}/entity/{entity_id}",
-		func(w http.ResponseWriter, r *http.Request) {
+		corsHandler(func(w http.ResponseWriter, r *http.Request) {
+			fmt.Println("hallo get")
 			gid := mux.Vars(r)["gamespace_id"]
 			eid := mux.Vars(r)["entity_id"]
 			checkGamespace(gid, w, func() {
 				w.Header().Set("Access-Control-Allow-Origin", "*")
+				w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE")
 				jsonDump, err := gamespaces[gid].Entity(eid).JsonDump()
 				if err != nil {
 					fmt.Fprintf(w, "some kind of error")
@@ -79,7 +112,7 @@ func Serve(gamespaces map[string]Gamespace,
 				}
 				//w.Write(jsonDump)
 			})
-		}).Methods("GET")
+		})).Methods("GET", "OPTIONS")
 
 	router.HandleFunc("/{ruleName}",
 		func(w http.ResponseWriter, r *http.Request) {
