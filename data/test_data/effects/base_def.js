@@ -131,13 +131,14 @@ define.effect({
         return deps.bab + deps.ranged_ab_stat_bonus + sumBonuses(deps, "ranged_ab");
       }
     });
-    entity.vars.new({
+    entity.vars.newProxy({
       id: "ab_stat_proxy",
       depends: ["str_mod", "dex_mod"],
       modifies: ["melee_ab_stat_bonus", "ranged_ab_stat_bonus"],
       onEval: function(deps, mods) {
         mods.melee_ab_stat_bonus(deps.str_mod);
         mods.ranged_ab_stat_bonus(deps.dex_mod);
+        return 0;
       }
     })
 
@@ -161,7 +162,7 @@ define.effect({
         return 10 + deps.bab + deps.cmd_stat_bonus1 + deps.cmd_stat_bonus2 + sumBonuses(deps, "cmd");
       }
     });
-    entity.vars.new({
+    entity.vars.newProxy({
       id: "cm_stat_proxy",
       depends: ["str_mod", "dex_mod"],
       modifies: ["cmb_stat_bonus", "cmd_stat_bonus1", "cmd_stat_bonus2"],
@@ -169,6 +170,7 @@ define.effect({
         mods.cmb_stat_bonus(deps.str_mod);
         mods.cmd_stat_bonus1(deps.str_mod);
         mods.cmd_stat_bonus2(deps.dex_mod);
+        return 0;
       }
     });
     var cmTypes = ["bullrush", "dirtytrick", "disarm", "drag", "grapple",
@@ -228,12 +230,13 @@ define.effect({
         return deps.ac_base + sumBonuses(deps, "ac", flatfooted_ac_exclude);
       }
     })
-    entity.vars.new({
+    entity.vars.newProxy({
       id: "ac_stat_proxy",
       depends: ["dex_mod"],
       modifies: ["ac_stat_bonus"],
       onEval: function(deps, mods) {
         mods.ac_stat_bonus(deps.dex_mod);
+        return 0;
       }
     })
 
@@ -347,7 +350,7 @@ define.effect({
 
 
     // testing stuff
-    entity.vars.new({
+    entity.vars.newProxy({
       id: "test_proxy_1",
       modifies: ["fighter_lvl","will_save_insight_bonus","will_save_untyped_bonus","cmb_trip_untyped_bonus"],
       onEval: function(deps,mods) {
@@ -358,6 +361,7 @@ define.effect({
 
         mods.cmb_trip_untyped_bonus(4);
 
+        return 0;
       }
     })
   }

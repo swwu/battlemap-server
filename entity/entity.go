@@ -43,9 +43,10 @@ type Entity interface {
 }
 
 type entityJson struct {
-	Id      string             `json:"id"`
-	Vars    map[string]float64 `json:"vars"`
-	Effects map[string]bool    `json:"effects"`
+	Id         string             `json:"id"`
+	Vars       map[string]float64 `json:"vars"`
+	BaseValues map[string]float64 `json:"baseValues"`
+	Effects    map[string]bool    `json:"effects"`
 }
 
 type entity struct {
@@ -64,13 +65,6 @@ func NewEntity() Entity {
 	}
 }
 
-func NewEntityWithValues(baseValues map[string]float64) Entity {
-	ent := NewEntity()
-	ent.SetVars(baseValues)
-
-	return ent
-}
-
 func (ent *entity) VariableContext() variable.VariableContext {
 	return ent.variableContext
 }
@@ -80,25 +74,29 @@ func (ent *entity) BaseValues() map[string]float64 {
 }
 
 func (ent *entity) SetVars(vars map[string]float64) {
+	ent.Reset()
+
 	for id, value := range vars {
 		if ent.VariableContext().DataVariableExists(id) {
 			ent.baseValues[id] = value
 		} else {
-			logging.Warning.Println("Attempting to set non-data variable %s, skipping", id)
+			logging.Warning.Println("Attempting to set non-data variable", id, ", skipping")
 		}
 	}
+
+	ent.Calculate()
 }
 
 func (ent *entity) Reset() {
 	ent.variableContext = variable.NewContext()
-}
 
-func (ent *entity) Calculate() {
 	// evaluate all effects to instantiate variables
 	for _, eff := range ent.effects {
 		eff.OnEffect(ent)
 	}
+}
 
+func (ent *entity) Calculate() {
 	// apply base values
 	for valueVar, baseValue := range ent.baseValues {
 		if dataVar := ent.variableContext.DataVariable(valueVar); dataVar != nil {
@@ -210,9 +208,10 @@ func (ent *entity) V8Accessor() *v8.ObjectTemplate {
 
 func (ent *entity) JsonDump() ([]byte, error) {
 	jsonStruct := &entityJson{
-		Id:      "test",
-		Vars:    map[string]float64{},
-		Effects: map[string]bool{},
+		Id:         "test",
+		Vars:       map[string]float64{},
+		BaseValues: ent.baseValues,
+		Effects:    map[string]bool{},
 	}
 	vars := ent.VariableContext().Variables()
 	for k, v := range vars {
@@ -233,9 +232,11 @@ func (ent *entity) JsonPut(jsonString []byte) error {
 	err := json.Unmarshal(jsonString, jsonStruct)
 	if err != nil {
 		logging.Warning.Println("Error unmarshaling entity")
+		fmt.Println(err)
+		fmt.Println(string(jsonString))
 		return fmt.Errorf("Error unmarshaling entity")
 	}
-	ent.SetVars(jsonStruct.Vars)
+	ent.SetVars(jsonStruct.BaseValues)
 
 	return nil
 }
