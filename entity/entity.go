@@ -132,6 +132,14 @@ func (ent *entity) accumVariableFromV8Object(obj *v8.Object) (variable.Variable,
 	)
 }
 
+func (ent *entity) dataVariableFromV8Object(obj *v8.Object) (variable.Variable, error) {
+	return ent.variableContext.SetAccumVariable(
+		scripting.StringFromV8Object(obj, "id", ""),
+		scripting.StringFromV8Object(obj, "op", "+"), // default operation is add
+		scripting.NumberFromV8Object(obj, "init", 0), // default value is 0
+	)
+}
+
 func (ent *entity) V8VariableAccessor() *v8.ObjectTemplate {
 	return nil
 }
@@ -149,6 +157,11 @@ func (ent *entity) V8Accessor() *v8.ObjectTemplate {
 	})
 	varTemplate.Bind("newAccum", func(obj *v8.Object) {
 		ent.accumVariableFromV8Object(obj)
+	})
+	// a data variable is essentially a literal whose value can mutate and is
+	// not supplied in an effect
+	varTemplate.Bind("newData", func(obj *v8.Object) {
+		ent.dataVariableFromV8Object(obj)
 	})
 
 	labelTemplate := engine.NewObjectTemplate()

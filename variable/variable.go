@@ -90,11 +90,48 @@ func (sv *scriptVariable) OnEval() {
 	sv.value = retVal
 }
 
+type DataVariable interface {
+	Variable
+	SetValue(val float64)
+}
+
+type dataVariable struct {
+	id      string
+	context *variableContext
+	value   float64
+}
+
+func (dv *dataVariable) Id() string {
+	return dv.id
+}
+
+func (dv *dataVariable) Context() VariableContext {
+	return dv.context
+}
+
+func (dv *dataVariable) DependencyIds() []string {
+	return []string{}
+}
+
+func (dv *dataVariable) ModifyIds() []string {
+	return []string{}
+}
+
+func (dv *dataVariable) Value() float64 {
+	return dv.value
+}
+
+func (dv *dataVariable) OnEval() {
+}
+
+func (dv *dataVariable) SetValue(val float64) {
+	dv.value = val
+}
+
 type AccumVariable interface {
 	Variable
 	SetDependencyIds(deps []string)
 	Accum(more float64)
-	Reset()
 }
 
 type accumVariable struct {
@@ -136,10 +173,6 @@ func (av *accumVariable) OnEval() {
 
 func (av *accumVariable) Accum(more float64) {
 	av.value = av.accumFn(av.value, more)
-}
-
-func (av *accumVariable) Reset() {
-	av.value = av.init
 }
 
 func addAccumFn(a float64, b float64) float64 {

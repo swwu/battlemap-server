@@ -10,11 +10,13 @@ import (
 // to guarantee consistency of variable evaluations.
 type VariableContext interface {
 	Variable(id string) Variable
+	DataVariable(id string) DataVariable
 	AccumVariable(id string) AccumVariable
-	SetLiteralVariable(id string, value float64)
+
+	SetDataVariable(id string, value float64) (DataVariable, error)
 	SetScriptVariable(id string, dependencies []string,
 		modifies []string, onEvalFn *v8.Function) (Variable, error)
-	SetAccumVariable(id string, op string, init float64) (Variable, error)
+	SetAccumVariable(id string, op string, init float64) (AccumVariable, error)
 
 	Variables() map[string]Variable
 
@@ -26,6 +28,10 @@ type VariableContext interface {
 type variableContext struct {
 	// all variables ever go here, even if they also go in other places
 	variables map[string]Variable
+
+	// data variables need to be tracked separately for mutations of underlying
+	// state
+	dataVariables map[string]DataVariable
 
 	// accums need to be tracked separately to track modification correctness
 	accumVariables map[string]AccumVariable
@@ -41,11 +47,24 @@ func NewContext() VariableContext {
 	}
 }
 
-func (vc *variableContext) SetLiteralVariable(id string, value float64) {
+func (vc *variableContext) SetDataVariable(id string, value float64) (
+	DataVariable, error) {
+	if _, exists := vc.variables[id]; exists {
+		return nil, fmt.Errorf("Variable with id", id, "already exists")
+	}
+
+	newVar := &dataVariable{
+		id:      id,
+		context: vc,
+		value:   value,
+	}
+	vc.variables[id] = newVar
+	vc.dataVariables[id] = newVar
+	return newVar, nil
 }
 
-// Creates a new variable. Variables are immutable but can be changed by
-// modifying accumulators on which they depend
+// Creates a new script variable. Script variables are immutable but can be
+// changed by modifying accumulators or literal variables on which they depend
 func (vc *variableContext) SetScriptVariable(id string, dependencyIds []string,
 	modifyIds []string, onEvalFn *v8.Function) (Variable, error) {
 	if _, exists := vc.variables[id]; exists {
@@ -66,7 +85,7 @@ func (vc *variableContext) SetScriptVariable(id string, dependencyIds []string,
 // Creates a new accumulator. Accumulators are mutable using a given
 // commutative operation
 func (vc *variableContext) SetAccumVariable(id string,
-	op string, init float64) (Variable, error) {
+	op string, init float64) (AccumVariable, error) {
 	if _, exists := vc.variables[id]; exists {
 		return nil, fmt.Errorf("Variable with id", id, "already exists")
 	}
@@ -88,6 +107,10 @@ func (vc *variableContext) SetAccumVariable(id string,
 
 func (vc *variableContext) Variable(id string) Variable {
 	return vc.variables[id]
+}
+
+func (vc *variableContext) DataVariable(id string) DataVariable {
+	return vc.dataVariables[id]
 }
 
 func (vc *variableContext) AccumVariable(id string) AccumVariable {

@@ -52,7 +52,7 @@ func Serve(gamespaces map[string]Gamespace,
 	router.HandleFunc("/gamespace/{gamespace_id}/entity",
 		func(w http.ResponseWriter, r *http.Request) {
 			gid := mux.Vars(r)["gamespace_id"]
-			eid := mux.Vars(r)["entity_id"]
+			//eid := mux.Vars(r)["entity_id"]
 			checkGamespace(gid, w, func() {
 				w.Header().Set("Access-Control-Allow-Origin", "*")
 			})
