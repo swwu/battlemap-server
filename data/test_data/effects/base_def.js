@@ -69,9 +69,8 @@ define.effect({
       // wrap the scope in a function so that callbacks reference the correct
       // value of i
       (function (score) {
-        entity.vars.newAccum({
+        entity.vars.newData({
           id: score+"_base",
-          op: "+",
           init: 0
         })
         generateBonusAccums(entity,score);

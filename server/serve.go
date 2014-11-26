@@ -3,6 +3,7 @@ package server
 import (
 	"fmt"
 	"html"
+	"io/ioutil"
 	"net/http"
 
 	"github.com/gorilla/mux"
@@ -52,9 +53,15 @@ func Serve(gamespaces map[string]Gamespace,
 	router.HandleFunc("/gamespace/{gamespace_id}/entity",
 		func(w http.ResponseWriter, r *http.Request) {
 			gid := mux.Vars(r)["gamespace_id"]
-			//eid := mux.Vars(r)["entity_id"]
+			eid := mux.Vars(r)["entity_id"]
 			checkGamespace(gid, w, func() {
 				w.Header().Set("Access-Control-Allow-Origin", "*")
+				bodyText, err := ioutil.ReadAll(r.Body)
+				if err != nil {
+					fmt.Fprintf(w, "some kind of error")
+				} else {
+					gamespaces[gid].Entity(eid).JsonPut(bodyText)
+				}
 			})
 		}).Methods("POST", "PUT")
 

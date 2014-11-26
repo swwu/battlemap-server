@@ -26,6 +26,8 @@ type Entity interface {
 
 	BaseValues() map[string]float64
 
+	SetVars(vars map[string]float64)
+
 	Reset()
 	Calculate()
 	Recalculate()
@@ -37,6 +39,7 @@ type Entity interface {
 	V8Accessor() *v8.ObjectTemplate
 
 	JsonDump() ([]byte, error)
+	JsonPut(jsonString []byte) error
 }
 
 type entityJson struct {
@@ -62,11 +65,10 @@ func NewEntity() Entity {
 }
 
 func NewEntityWithValues(baseValues map[string]float64) Entity {
-	return &entity{
-		variableContext: variable.NewContext(),
-		baseValues:      baseValues,
-		effects:         []effect.Effect{},
-	}
+	ent := NewEntity()
+	ent.SetVars(baseValues)
+
+	return ent
 }
 
 func (ent *entity) VariableContext() variable.VariableContext {
@@ -75,6 +77,16 @@ func (ent *entity) VariableContext() variable.VariableContext {
 
 func (ent *entity) BaseValues() map[string]float64 {
 	return ent.baseValues
+}
+
+func (ent *entity) SetVars(vars map[string]float64) {
+	for id, value := range vars {
+		if ent.VariableContext().DataVariableExists(id) {
+			ent.baseValues[id] = value
+		} else {
+			logging.Warning.Println("Attempting to set non-data variable %s, skipping", id)
+		}
+	}
 }
 
 func (ent *entity) Reset() {
@@ -89,10 +101,10 @@ func (ent *entity) Calculate() {
 
 	// apply base values
 	for valueVar, baseValue := range ent.baseValues {
-		if accum := ent.variableContext.AccumVariable(valueVar); accum != nil {
-			accum.Accum(baseValue)
+		if dataVar := ent.variableContext.DataVariable(valueVar); dataVar != nil {
+			dataVar.SetValue(baseValue)
 		} else {
-			logging.Warning.Println("Entity base value was not an accumulator")
+			logging.Warning.Println("Entity base value was not a data variable")
 		}
 	}
 
@@ -133,9 +145,8 @@ func (ent *entity) accumVariableFromV8Object(obj *v8.Object) (variable.Variable,
 }
 
 func (ent *entity) dataVariableFromV8Object(obj *v8.Object) (variable.Variable, error) {
-	return ent.variableContext.SetAccumVariable(
+	return ent.variableContext.SetDataVariable(
 		scripting.StringFromV8Object(obj, "id", ""),
-		scripting.StringFromV8Object(obj, "op", "+"), // default operation is add
 		scripting.NumberFromV8Object(obj, "init", 0), // default value is 0
 	)
 }
@@ -215,4 +226,16 @@ func (ent *entity) JsonDump() ([]byte, error) {
 		return nil, fmt.Errorf("Error marshaling entity")
 	}
 	return jsonString, nil
+}
+
+func (ent *entity) JsonPut(jsonString []byte) error {
+	jsonStruct := &entityJson{}
+	err := json.Unmarshal(jsonString, jsonStruct)
+	if err != nil {
+		logging.Warning.Println("Error unmarshaling entity")
+		return fmt.Errorf("Error unmarshaling entity")
+	}
+	ent.SetVars(jsonStruct.Vars)
+
+	return nil
 }

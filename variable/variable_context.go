@@ -18,6 +18,8 @@ type VariableContext interface {
 		modifies []string, onEvalFn *v8.Function) (Variable, error)
 	SetAccumVariable(id string, op string, init float64) (AccumVariable, error)
 
+	DataVariableExists(id string) bool
+
 	Variables() map[string]Variable
 
 	DependencyOrdering() ([]Variable, error)
@@ -43,6 +45,7 @@ type variableContext struct {
 func NewContext() VariableContext {
 	return &variableContext{
 		variables:      map[string]Variable{},
+		dataVariables:  map[string]DataVariable{},
 		accumVariables: map[string]AccumVariable{},
 	}
 }
@@ -103,6 +106,11 @@ func (vc *variableContext) SetAccumVariable(id string,
 	vc.variables[id] = newVar
 	vc.accumVariables[id] = newVar
 	return newVar, nil
+}
+
+func (vc *variableContext) DataVariableExists(id string) bool {
+	_, exists := vc.dataVariables[id]
+	return exists
 }
 
 func (vc *variableContext) Variable(id string) Variable {
