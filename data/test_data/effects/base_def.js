@@ -349,6 +349,7 @@ define.effect({
     })
 
 
+    /*
     // testing stuff
     entity.vars.newProxy({
       id: "test_proxy_1",
@@ -364,5 +365,6 @@ define.effect({
         return 0;
       }
     })
+    */
   }
 })
