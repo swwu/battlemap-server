@@ -97,6 +97,7 @@ func (vc *variableContext) SetAccumVariable(id string,
 		id:      id,
 		context: vc,
 		init:    init,
+		value:   init,
 	}
 	if op == "+" {
 		newVar.accumFn = addAccumFn

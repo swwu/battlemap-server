@@ -47,7 +47,7 @@ func main() {
 	vals := []string{"str", "str_mod", "dex", "dex_mod", "fighter_lvl", "bab",
 		"melee_ab", "will_save", "will_save_insight_bonus",
 		"will_save_untyped_bonus", "fort_save", "ref_save", "ac_base",
-		"ac_stat_bonus", "ac", "ac_touch", "ac_flatfooted", "cmb", "cmd",
+		"ac_abmod_bonus", "ac", "ac_touch", "ac_flatfooted", "cmb", "cmd",
 		"cmb_trip", "cmb_grapple", "hp"}
 	for _, val := range vals {
 		fmt.Println(val, "-", vc.Variable(val).Value())

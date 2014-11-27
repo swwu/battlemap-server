@@ -168,7 +168,7 @@ func (av *accumVariable) Value() float64 {
 }
 
 func (av *accumVariable) OnEval() {
-	av.value = av.accumFn(av.value, av.init)
+	// accumulators do nothing on eval
 }
 
 func (av *accumVariable) Accum(more float64) {

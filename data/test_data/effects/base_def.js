@@ -57,6 +57,23 @@ var sumBonuses = function(deps, stat_name, exclude) {
   },0);
 }
 
+var generateAbmodBonusAccums = function(entity, stat_name, attr_name) {
+  entity.vars.newAccum({
+    id: stat_name + "_abmod_bonus",
+    op: "max",
+    init: -1000000
+  })
+  entity.vars.newProxy({
+    id: stat_name + "_abmod_proxy",
+    depends: [attr_name],
+    modifies: [stat_name + "_abmod_bonus"],
+    onEval: function(deps, mods) {
+      mods[stat_name + "_abmod_bonus"](deps[attr_name]);
+      return 0;
+    }
+  })
+}
+
 define.effect({
   id: "baseEntityRules",
   tags: ["base"],
@@ -107,69 +124,69 @@ define.effect({
     });
     generateBonusAccums(entity,"melee_ab");
     entity.vars.newAccum({
-      id: "melee_ab_stat_bonus",
+      id: "melee_ab_abmod_bonus",
       op: "max",
       init: 0
     })
     entity.vars.new({
       id: "melee_ab",
-      depends: ["bab", "melee_ab_stat_bonus"].concat(generateBonusNames("melee_ab")),
+      depends: ["bab", "melee_ab_abmod_bonus"].concat(generateBonusNames("melee_ab")),
       onEval: function(deps) {
-        return deps.bab + deps.melee_ab_stat_bonus + sumBonuses(deps, "melee_ab");
+        return deps.bab + deps.melee_ab_abmod_bonus + sumBonuses(deps, "melee_ab");
       }
     });
     generateBonusAccums(entity,"ranged_ab");
     entity.vars.newAccum({
-      id: "ranged_ab_stat_bonus",
+      id: "ranged_ab_abmod_bonus",
       op: "max",
       init: 0
     })
     entity.vars.new({
       id: "ranged_ab",
-      depends: ["bab", "ranged_ab_stat_bonus"].concat(generateBonusNames("ranged_ab")),
+      depends: ["bab", "ranged_ab_abmod_bonus"].concat(generateBonusNames("ranged_ab")),
       onEval: function(deps) {
-        return deps.bab + deps.ranged_ab_stat_bonus + sumBonuses(deps, "ranged_ab");
+        return deps.bab + deps.ranged_ab_abmod_bonus + sumBonuses(deps, "ranged_ab");
       }
     });
     entity.vars.newProxy({
-      id: "ab_stat_proxy",
+      id: "ab_abmod_proxy",
       depends: ["str_mod", "dex_mod"],
-      modifies: ["melee_ab_stat_bonus", "ranged_ab_stat_bonus"],
+      modifies: ["melee_ab_abmod_bonus", "ranged_ab_abmod_bonus"],
       onEval: function(deps, mods) {
-        mods.melee_ab_stat_bonus(deps.str_mod);
-        mods.ranged_ab_stat_bonus(deps.dex_mod);
+        mods.melee_ab_abmod_bonus(deps.str_mod);
+        mods.ranged_ab_abmod_bonus(deps.dex_mod);
         return 0;
       }
     })
 
     generateBonusAccums(entity,"cmb");
-    entity.vars.newAccum({id: "cmb_stat_bonus", op: "max", init: 0 });
+    entity.vars.newAccum({id: "cmb_abmod_bonus", op: "max", init: 0 });
     entity.vars.new({
       id: "cmb",
-      depends: ["bab", "cmb_stat_bonus"].concat(generateBonusNames("cmb")),
+      depends: ["bab", "cmb_abmod_bonus"].concat(generateBonusNames("cmb")),
       onEval: function(deps) {
-        return deps.bab + deps.cmb_stat_bonus + sumBonuses(deps, "cmb");
+        return deps.bab + deps.cmb_abmod_bonus + sumBonuses(deps, "cmb");
       }
     });
 
     generateBonusAccums(entity,"cmd");
-    entity.vars.newAccum({id: "cmd_stat_bonus1", op: "max", init: 0 });
-    entity.vars.newAccum({id: "cmd_stat_bonus2", op: "max", init: 0 });
+    entity.vars.newAccum({id: "cmd_abmod_bonus1", op: "max", init: 0 });
+    entity.vars.newAccum({id: "cmd_abmod_bonus2", op: "max", init: 0 });
     entity.vars.new({
       id: "cmd",
-      depends: ["bab", "cmd_stat_bonus1", "cmd_stat_bonus2"].concat(generateBonusNames("cmd")),
+      depends: ["bab", "cmd_abmod_bonus1", "cmd_abmod_bonus2"].concat(generateBonusNames("cmd")),
       onEval: function(deps) {
-        return 10 + deps.bab + deps.cmd_stat_bonus1 + deps.cmd_stat_bonus2 + sumBonuses(deps, "cmd");
+        return 10 + deps.bab + deps.cmd_abmod_bonus1 + deps.cmd_abmod_bonus2 + sumBonuses(deps, "cmd");
       }
     });
     entity.vars.newProxy({
-      id: "cm_stat_proxy",
+      id: "cm_abmod_proxy",
       depends: ["str_mod", "dex_mod"],
-      modifies: ["cmb_stat_bonus", "cmd_stat_bonus1", "cmd_stat_bonus2"],
+      modifies: ["cmb_abmod_bonus", "cmd_abmod_bonus1", "cmd_abmod_bonus2"],
       onEval: function(deps, mods) {
-        mods.cmb_stat_bonus(deps.str_mod);
-        mods.cmd_stat_bonus1(deps.str_mod);
-        mods.cmd_stat_bonus2(deps.dex_mod);
+        mods.cmb_abmod_bonus(deps.str_mod);
+        mods.cmd_abmod_bonus1(deps.str_mod);
+        mods.cmd_abmod_bonus2(deps.dex_mod);
         return 0;
       }
     });
@@ -203,24 +220,20 @@ define.effect({
       op: "+",
       init: 10
     });
-    entity.vars.newAccum({
-      id: "ac_stat_bonus",
-      op: "max",
-      init: 0
-    })
+    generateAbmodBonusAccums(entity, "ac", "dex_mod");
     generateBonusAccums(entity,"ac");
     entity.vars.new({
       id: "ac",
-      depends: ["ac_base","ac_stat_bonus"].concat(generateBonusNames("ac")),
+      depends: ["ac_base","ac_abmod_bonus"].concat(generateBonusNames("ac")),
       onEval: function(deps) {
-        return deps.ac_base + deps.ac_stat_bonus + sumBonuses(deps, "ac");
+        return deps.ac_base + deps.ac_abmod_bonus + sumBonuses(deps, "ac");
       }
     })
     entity.vars.new({
       id: "ac_touch",
-      depends: ["ac_base","ac_stat_bonus"].concat(generateBonusNames("ac",touch_ac_exclude)),
+      depends: ["ac_base","ac_abmod_bonus"].concat(generateBonusNames("ac",touch_ac_exclude)),
       onEval: function(deps) {
-        return deps.ac_base + deps.ac_stat_bonus + sumBonuses(deps, "ac", touch_ac_exclude);
+        return deps.ac_base + deps.ac_abmod_bonus + sumBonuses(deps, "ac", touch_ac_exclude);
       }
     })
     entity.vars.new({
@@ -228,15 +241,6 @@ define.effect({
       depends: ["ac_base"].concat(generateBonusNames("ac",flatfooted_ac_exclude)),
       onEval: function(deps) {
         return deps.ac_base + sumBonuses(deps, "ac", flatfooted_ac_exclude);
-      }
-    })
-    entity.vars.newProxy({
-      id: "ac_stat_proxy",
-      depends: ["dex_mod"],
-      modifies: ["ac_stat_bonus"],
-      onEval: function(deps, mods) {
-        mods.ac_stat_bonus(deps.dex_mod);
-        return 0;
       }
     })
 
@@ -250,23 +254,25 @@ define.effect({
     generateBonusAccums(entity,"will_save");
     entity.vars.new({
       id: "will_save",
-      depends: ["will_save_base","wis_mod"].concat(generateBonusNames("will_save")),
+      depends: ["will_save_base","will_save_abmod_bonus"].concat(generateBonusNames("will_save")),
       onEval: function(deps) {
-        return deps.will_save_base + deps.wis_mod + sumBonuses(deps, "will_save");
+        return deps.will_save_base + deps.will_save_abmod_bonus + sumBonuses(deps, "will_save");
       }
     })
+    generateAbmodBonusAccums(entity, "will_save", "wis_mod");
     entity.vars.newAccum({
-      id: "will_save_fear_bonus",
+      id: "will_save_vs_fear_bonus",
       op: "+",
       init: 0
     });
     entity.vars.new({
-      id: "will_save_fear",
-      depends: ["will_save", "will_save_fear_bonus"],
+      id: "will_save_vs_fear",
+      depends: ["will_save", "will_save_vs_fear_bonus"],
       onEval: function(deps) {
-        return deps.will_save + deps.will_save_fear_bonus
+        return deps.will_save + deps.will_save_vs_fear_bonus
       }
     })
+
     entity.vars.newAccum({
       id: "fort_save_base",
       op: "+",
@@ -275,11 +281,13 @@ define.effect({
     generateBonusAccums(entity,"fort_save");
     entity.vars.new({
       id: "fort_save",
-      depends: ["fort_save_base","con_mod"].concat(generateBonusNames("fort_save")),
+      depends: ["fort_save_base","fort_save_abmod_bonus"].concat(generateBonusNames("fort_save")),
       onEval: function(deps) {
-        return deps.fort_save_base + deps.con_mod + sumBonuses(deps, "fort_save");
+        return deps.fort_save_base + deps.fort_save_abmod_bonus + sumBonuses(deps, "fort_save");
       }
     })
+    generateAbmodBonusAccums(entity, "fort_save", "con_mod");
+
     entity.vars.newAccum({
       id: "ref_save_base",
       op: "+",
@@ -288,11 +296,13 @@ define.effect({
     generateBonusAccums(entity,"ref_save");
     entity.vars.new({
       id: "ref_save",
-      depends: ["ref_save_base","dex_mod"].concat(generateBonusNames("ref_save")),
+      depends: ["ref_save_base","ref_save_abmod_bonus"].concat(generateBonusNames("ref_save")),
       onEval: function(deps) {
-        return deps.ref_save_base + deps.dex_mod + sumBonuses(deps, "ref_save");
+        return deps.ref_save_base + deps.ref_save_abmod_bonus + sumBonuses(deps, "ref_save");
       }
     })
+    generateAbmodBonusAccums(entity, "ref_save", "dex_mod");
+
 
     // movement
     entity.vars.newAccum({
@@ -349,7 +359,6 @@ define.effect({
     })
 
 
-    /*
     // testing stuff
     entity.vars.newProxy({
       id: "test_proxy_1",
@@ -365,6 +374,5 @@ define.effect({
         return 0;
       }
     })
-    */
   }
 })
