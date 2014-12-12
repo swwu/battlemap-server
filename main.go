@@ -30,7 +30,7 @@ func main() {
 	ent.AddEffect(rules.Effects()["baseEntityRules"])
 	ent.AddEffect(rules.Effects()["fighterClass"])
 
-	ent.SetVars(map[string]float64{
+	ent.SetBaseValues(map[string]float64{
 		"str_base":    14,
 		"dex_base":    14,
 		"con_base":    14,

@@ -43,6 +43,24 @@ func NumberFromV8Object(obj *v8.Object, key string, defaultVal float64) float64 
 	}
 }
 
+func BooleanFromV8Object(obj *v8.Object, key string, defaultVal bool) bool {
+	if obj.HasProperty(key) {
+		val := obj.GetProperty(key)
+		if val.IsBoolean() {
+			return val.ToBoolean()
+		} else {
+			logging.Warning.Println(
+				"Tried to extract boolean value from non-boolean field:", key,
+				"value is", val.ToString())
+			return defaultVal
+		}
+	} else {
+		logging.Warning.Println(
+			"Tried to extract boolean value from empty field:", key)
+		return defaultVal
+	}
+}
+
 func FnFromV8Object(obj *v8.Object, key string, defaultVal *v8.Function) *v8.Function {
 	if obj.HasProperty(key) {
 		val := obj.GetProperty(key)
@@ -101,6 +119,16 @@ func NumberFromV8Value(val *v8.Value, defaultVal float64) float64 {
 	} else {
 		logging.Warning.Println(
 			"Tried to extract number value from non-number value:", val.ToString())
+		return defaultVal
+	}
+}
+
+func BooleanFromV8Value(val *v8.Value, defaultVal bool) bool {
+	if val.IsBoolean() {
+		return val.ToBoolean()
+	} else {
+		logging.Warning.Println(
+			"Tried to extract boolean value from non-boolean value:", val.ToString())
 		return defaultVal
 	}
 }

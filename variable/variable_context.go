@@ -3,9 +3,74 @@ package variable
 import (
 	"fmt"
 
-	"github.com/swwu/v8.go"
+	"github.com/swwu/battlemap-server/classes"
 )
 
+type variableContext struct {
+	variables        map[string]classes.Variable
+	dataVariables    map[string]classes.DataVariable
+	reducerVariables map[string]classes.ReducerVariable
+}
+
+func NewContext() classes.VariableContext {
+	return &variableContext{
+		variables:        map[string]classes.Variable{},
+		dataVariables:    map[string]classes.DataVariable{},
+		reducerVariables: map[string]classes.ReducerVariable{},
+	}
+}
+
+func (vc *variableContext) Variable(id string) classes.Variable {
+	return vc.variables[id]
+}
+
+func (vc *variableContext) DataVariable(id string) classes.DataVariable {
+	return vc.dataVariables[id]
+}
+
+func (vc *variableContext) ReducerVariable(id string) classes.ReducerVariable {
+	return vc.reducerVariables[id]
+}
+
+func (vc *variableContext) Variables() map[string]classes.Variable {
+	return vc.variables
+}
+
+func (vc *variableContext) SetReducerVariable(id string,
+	defaultValue float64) (classes.ReducerVariable, error) {
+	if _, exists := vc.variables[id]; exists {
+		return nil, fmt.Errorf("Variable with id", id, "already exists")
+	}
+
+	newVar := &reducerVariable{
+		id:           id,
+		defaultValue: defaultValue,
+		value:        defaultValue,
+		reducerOps:   []classes.ReducerOp{},
+	}
+
+	vc.variables[id] = newVar
+	vc.reducerVariables[id] = newVar
+
+	return newVar, nil
+}
+
+func (vc *variableContext) SetDataVariable(id string, value float64) (
+	classes.DataVariable, error) {
+	if _, exists := vc.variables[id]; exists {
+		return nil, fmt.Errorf("Variable with id", id, "already exists")
+	}
+
+	newVar := &dataVariable{
+		id:    id,
+		value: value,
+	}
+	vc.variables[id] = newVar
+	vc.dataVariables[id] = newVar
+	return newVar, nil
+}
+
+/*
 // A general scope for game-related variables. Implements dependency patterns
 // to guarantee consistency of variable evaluations.
 type VariableContext interface {
@@ -196,3 +261,4 @@ func (vc *variableContext) DependencyOrdering() ([]Variable, error) {
 func (vc *variableContext) Variables() map[string]Variable {
 	return vc.variables
 }
+*/

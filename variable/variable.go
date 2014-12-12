@@ -1,11 +1,23 @@
 package variable
 
-import (
-	"github.com/swwu/v8.go"
+type dataVariable struct {
+	id    string
+	value float64
+}
 
-	"github.com/swwu/battlemap-server/scripting"
-)
+func (dv *dataVariable) Id() string {
+	return dv.id
+}
 
+func (dv *dataVariable) Value() float64 {
+	return dv.value
+}
+
+func (dv *dataVariable) SetValue(val float64) {
+	dv.value = val
+}
+
+/*
 type Variable interface {
 	Id() string
 	Context() VariableContext
@@ -186,3 +198,4 @@ func maxAccumFn(a float64, b float64) float64 {
 		return b
 	}
 }
+*/

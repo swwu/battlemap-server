@@ -7,40 +7,11 @@ import (
 
 	"github.com/swwu/v8.go"
 
-	"github.com/swwu/battlemap-server/effect"
+	"github.com/swwu/battlemap-server/classes"
 	"github.com/swwu/battlemap-server/logging"
 	"github.com/swwu/battlemap-server/scripting"
 	"github.com/swwu/battlemap-server/variable"
 )
-
-type Footprint struct {
-}
-
-type Collider interface {
-	Footprint() Footprint
-}
-
-// an entity is defined by its variables and its effect
-type Entity interface {
-	VariableContext() variable.VariableContext
-
-	BaseValues() map[string]float64
-
-	SetVars(vars map[string]float64)
-
-	Reset()
-	Calculate()
-	Recalculate()
-
-	AddEffect(eff effect.Effect)
-
-	// returns a *v8.Value instead of *v8.Object (since object can't be easily
-	// converted back to value)
-	V8Accessor() *v8.ObjectTemplate
-
-	JsonDump() ([]byte, error)
-	JsonPut(jsonString []byte) error
-}
 
 type entityJson struct {
 	Id         string             `json:"id"`
@@ -50,22 +21,23 @@ type entityJson struct {
 }
 
 type entity struct {
-	variableContext variable.VariableContext
+	variableContext classes.VariableContext
 
 	baseValues map[string]float64
 
-	effects []effect.Effect
+	effects []classes.Effect
+	rules   []classes.Rule
 }
 
-func NewEntity() Entity {
+func NewEntity() classes.Entity {
 	return &entity{
 		variableContext: variable.NewContext(),
 		baseValues:      map[string]float64{},
-		effects:         []effect.Effect{},
+		effects:         []classes.Effect{},
 	}
 }
 
-func (ent *entity) VariableContext() variable.VariableContext {
+func (ent *entity) VariableContext() classes.VariableContext {
 	return ent.variableContext
 }
 
@@ -73,11 +45,11 @@ func (ent *entity) BaseValues() map[string]float64 {
 	return ent.baseValues
 }
 
-func (ent *entity) SetVars(vars map[string]float64) {
+func (ent *entity) SetBaseValues(vars map[string]float64) {
 	ent.Reset()
 
 	for id, value := range vars {
-		if ent.VariableContext().DataVariableExists(id) {
+		if dataVar := ent.VariableContext().DataVariable(id); dataVar != nil {
 			ent.baseValues[id] = value
 		} else {
 			logging.Warning.Println("Attempting to set non-data variable", id, ", skipping")
@@ -87,11 +59,111 @@ func (ent *entity) SetVars(vars map[string]float64) {
 	ent.Calculate()
 }
 
+func (ent *entity) RuleDependencyOrdering() ([]classes.Rule, error) {
+	queue := []classes.Rule{}
+	sortedList := []classes.Rule{}
+
+	// given a ruleid, number of dependencies left to evaluate for it before we
+	// can safely enqueue it
+	depsLeft := map[string]int{}
+
+	// given a varname, what rules are modified by that variable
+	varMods := map[string][]classes.Rule{}
+	// given a varname, what rules does that variable depend on
+	varDeps := map[string][]classes.Rule{}
+
+	// first pass, initialize leaves into queue and varMods/varDeps
+	for _, rule := range ent.rules {
+		depVars := rule.Dependencies(ent)
+		modVars := rule.Modifies(ent)
+		if len(depVars) == 0 {
+			queue = append(queue, rule)
+		}
+
+		for _, depVar := range depVars {
+			varMods[depVar.Id()] = append(varMods[depVar.Id()], rule)
+		}
+		for _, modVar := range modVars {
+			varDeps[modVar.Id()] = append(varDeps[modVar.Id()], rule)
+		}
+	}
+
+	// util functions to easily get an array of deps/mods for each rule
+	// these only work once varMods/varDeps are populated
+	getMods := func(curRule classes.Rule) []classes.Rule {
+		modVars := curRule.Modifies(ent)
+		allMods := map[classes.Rule]bool{}
+
+		for _, modVar := range modVars {
+			for _, modRule := range varMods[modVar.Id()] {
+				allMods[modRule] = true
+			}
+		}
+
+		ret := make([]classes.Rule, 0, len(allMods))
+		for k := range allMods {
+			ret = append(ret, k)
+		}
+		return ret
+	}
+	getDeps := func(curRule classes.Rule) []classes.Rule {
+		depVars := curRule.Dependencies(ent)
+		allDeps := map[classes.Rule]bool{}
+
+		for _, depVar := range depVars {
+			for _, depRule := range varDeps[depVar.Id()] {
+				allDeps[depRule] = true
+			}
+		}
+
+		ret := make([]classes.Rule, 0, len(allDeps))
+		for k := range allDeps {
+			ret = append(ret, k)
+		}
+		return ret
+	}
+
+	// second pass, use varMods/varDeps to populate
+	for _, rule := range ent.rules {
+		deps := getDeps(rule)
+		depsLeft[rule.Id()] = len(deps)
+	}
+
+	// go through the queue, enqueueing things
+	for len(queue) > 0 {
+		curRule := queue[len(queue)-1]
+		queue = queue[:len(queue)-1]
+		sortedList = append(sortedList, curRule)
+
+		for _, modRule := range getMods(curRule) {
+			// decrement the number untraversed incoming edges
+			depsLeft[modRule.Id()] -= 1
+			// if we're out of untraversed incoming edges then enqueue
+			if depsLeft[modRule.Id()] == 0 {
+				// I guess technically it's a stack because the ordering don't mattuh
+				queue = append(queue, modRule)
+			}
+		}
+	}
+
+	// if any of our rules still have untraversed incoming edges then we have a
+	// cycle (we weren't able to traverse all the rules)
+	for _, depsLeft := range depsLeft {
+		if depsLeft > 0 {
+			return nil, fmt.Errorf("Cannot toposort - dependency graph has cycles")
+		}
+	}
+
+	// otherwise yey
+	return sortedList, nil
+}
+
 func (ent *entity) Reset() {
 	ent.variableContext = variable.NewContext()
 
 	// evaluate all effects to instantiate variables
 	for _, eff := range ent.effects {
+		//TODO: next up is effects add rules
 		eff.OnEffect(ent)
 	}
 }
@@ -107,12 +179,12 @@ func (ent *entity) Calculate() {
 	}
 
 	// evaluate all variable nodes in dependency order
-	dependencyOrder, err := ent.variableContext.DependencyOrdering()
+	orderedRules, err := ent.RuleDependencyOrdering()
 	if err != nil {
 		logging.Error.Println(err)
 	}
-	for _, variable := range dependencyOrder {
-		variable.OnEval()
+	for _, rule := range orderedRules {
+		rule.Eval(ent)
 	}
 }
 
@@ -121,28 +193,18 @@ func (ent *entity) Recalculate() {
 	ent.Calculate()
 }
 
-func (ent *entity) AddEffect(eff effect.Effect) {
+func (ent *entity) AddEffect(eff classes.Effect) {
 	ent.effects = append(ent.effects, eff)
 }
 
-func (ent *entity) variableFromV8Object(obj *v8.Object) (variable.Variable, error) {
-	return ent.variableContext.SetScriptVariable(
+func (ent *entity) variableFromV8Object(obj *v8.Object) (classes.Variable, error) {
+	return ent.variableContext.SetReducerVariable(
 		scripting.StringFromV8Object(obj, "id", ""),
-		scripting.StringArrFromV8Object(obj, "depends", []string{}),
-		scripting.StringArrFromV8Object(obj, "modifies", []string{}),
-		scripting.FnFromV8Object(obj, "onEval", nil),
-	)
-}
-
-func (ent *entity) accumVariableFromV8Object(obj *v8.Object) (variable.Variable, error) {
-	return ent.variableContext.SetAccumVariable(
-		scripting.StringFromV8Object(obj, "id", ""),
-		scripting.StringFromV8Object(obj, "op", "+"), // default operation is add
 		scripting.NumberFromV8Object(obj, "init", 0), // default value is 0
 	)
 }
 
-func (ent *entity) dataVariableFromV8Object(obj *v8.Object) (variable.Variable, error) {
+func (ent *entity) dataVariableFromV8Object(obj *v8.Object) (classes.Variable, error) {
 	return ent.variableContext.SetDataVariable(
 		scripting.StringFromV8Object(obj, "id", ""),
 		scripting.NumberFromV8Object(obj, "init", 0), // default value is 0
@@ -160,13 +222,7 @@ func (ent *entity) V8Accessor() *v8.ObjectTemplate {
 	varTemplate.Bind("new", func(obj *v8.Object) {
 		ent.variableFromV8Object(obj)
 	})
-	// a proxy is a variable whose purpose is to modify other variables
-	varTemplate.Bind("newProxy", func(obj *v8.Object) {
-		ent.variableFromV8Object(obj)
-	})
-	varTemplate.Bind("newAccum", func(obj *v8.Object) {
-		ent.accumVariableFromV8Object(obj)
-	})
+
 	// a data variable is essentially a literal whose value can mutate and is
 	// not supplied in an effect
 	varTemplate.Bind("newData", func(obj *v8.Object) {
@@ -236,7 +292,7 @@ func (ent *entity) JsonPut(jsonString []byte) error {
 		fmt.Println(string(jsonString))
 		return fmt.Errorf("Error unmarshaling entity")
 	}
-	ent.SetVars(jsonStruct.BaseValues)
+	ent.SetBaseValues(jsonStruct.BaseValues)
 
 	return nil
 }

@@ -7,27 +7,31 @@ import (
 
 	"github.com/swwu/v8.go"
 
-	"github.com/swwu/battlemap-server/action"
+	"github.com/swwu/battlemap-server/classes"
 	"github.com/swwu/battlemap-server/effect"
 	"github.com/swwu/battlemap-server/logging"
+	"github.com/swwu/battlemap-server/rule"
 	"github.com/swwu/battlemap-server/scripting"
 )
 
 type Ruleset interface {
-	Effects() map[string]effect.Effect
+	Effects() map[string]classes.Effect
+	Rules() map[string]classes.Rule
 
 	ReadData(root string) error
 }
 
 type ruleset struct {
-	effects map[string]effect.Effect
+	effects map[string]classes.Effect
+	rules   map[string]classes.Rule
 
 	v8context *v8.Context
 }
 
 func NewRuleset() Ruleset {
 	ret := &ruleset{
-		effects: map[string]effect.Effect{},
+		effects: map[string]classes.Effect{},
+		rules:   map[string]classes.Rule{},
 	}
 	ret.constructGlobalContext()
 
@@ -40,13 +44,17 @@ func NewRulesetFromData(path string) Ruleset {
 	return ret
 }
 
-func (rs *ruleset) Effects() map[string]effect.Effect {
+func (rs *ruleset) Effects() map[string]classes.Effect {
 	return rs.effects
+}
+
+func (rs *ruleset) Rules() map[string]classes.Rule {
+	return rs.rules
 }
 
 // read all js files from data/effects to make effects
 func (rs *ruleset) ReadData(root string) error {
-	effects := make([]effect.Effect, 0)
+	effects := make([]classes.Effect, 0)
 
 	err := filepath.Walk(root, func(path string, f os.FileInfo, err error) error {
 		if path[len(path)-3:] == ".js" {
@@ -98,18 +106,16 @@ func (rs *ruleset) constructGlobalContext() {
 		// TODO: check for id collision
 		rs.effects[newEff.Id()] = newEff
 	})
-	defineTemplate.Bind("effectGroup", func(obj *v8.Object) {
-	})
-	defineTemplate.Bind("action", func(obj *v8.Object) {
-		newAction := action.NewScriptAction(
-		//scripting.StringFromV8Object(obj, "id", "defaultId"),
-		//scripting.StringFromV8Object(obj, "displayName", "unnamed"),
-		//scripting.StringFromV8Object(obj, "displayType", "none"),
-		//scripting.FnFromV8Object(obj, "onEffect", nil),
+	defineTemplate.Bind("rule", func(obj *v8.Object) {
+		newRule := rule.NewRule(
+			scripting.StringFromV8Object(obj, "id", "defaultId"),
+			scripting.StringArrFromV8Object(obj, "depends", []string{}),
+			scripting.StringArrFromV8Object(obj, "modifies", []string{}),
+			rule.MakeV8EvalFn(scripting.FnFromV8Object(obj, "onEval", nil)),
 		)
-		// TODO: check for id collision
-		//rs.effects[newEff.Id()] = newEff
-		logging.Trace.Println(newAction)
+		logging.Trace.Println(newRule)
+
+		rs.rules[newRule.Id()] = newRule
 	})
 	global.SetAccessor("define",
 		// get

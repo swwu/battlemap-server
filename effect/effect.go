@@ -3,33 +3,9 @@ package effect
 import (
 	"github.com/swwu/v8.go"
 
+	"github.com/swwu/battlemap-server/classes"
 	"github.com/swwu/battlemap-server/scripting"
 )
-
-/*
- * Effect groups are groupings of effects that are all required to produce a
- * certain gameplay mechanic (e.g. a class + its class abilities)
- */
-type EffectGroup interface {
-	Id() string
-	Effects() []Effect
-}
-
-/*
- * Effects mutate the state of entities and are persistent
- */
-type Effect interface {
-	Id() string
-	DisplayName() string
-	DisplayType() string
-	/* in general +- should be on priority 0, /* should be on priority 1 */
-
-	OnEffect(ent V8AccessorProvider)
-}
-
-type V8AccessorProvider interface {
-	V8Accessor() *v8.ObjectTemplate
-}
 
 // javascript-code effect
 type scriptEffect struct {
@@ -40,7 +16,7 @@ type scriptEffect struct {
 }
 
 func NewScriptEffect(id string, displayName string, displayType string,
-	onEffectFn *v8.Function) Effect {
+	onEffectFn *v8.Function) classes.Effect {
 	return &scriptEffect{
 		id:          id,
 		displayName: displayName,
@@ -61,7 +37,7 @@ func (eff *scriptEffect) DisplayType() string {
 	return eff.displayType
 }
 
-func (eff *scriptEffect) OnEffect(ent V8AccessorProvider) {
+func (eff *scriptEffect) OnEffect(ent classes.V8AccessorProvider) {
 	if eff.onEffectFn == nil {
 		// function is nil? nothing to do
 		return
