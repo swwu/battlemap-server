@@ -2,9 +2,8 @@ package classes
 
 type Rule interface {
 	Id() string
-	DependencyIds() []string
-	ModifyIds() []string
-	Dependencies(ent Entity) []Variable
-	Modifies(ent Entity) []Variable
+
+	// evaluating a rule places its reductions and variables into the entity's
+	// context
 	Eval(ent Entity)
 }

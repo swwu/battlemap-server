@@ -9,6 +9,7 @@ import (
 
 	"github.com/swwu/battlemap-server/classes"
 	"github.com/swwu/battlemap-server/logging"
+	"github.com/swwu/battlemap-server/reduction"
 	"github.com/swwu/battlemap-server/scripting"
 	"github.com/swwu/battlemap-server/variable"
 )
@@ -25,15 +26,18 @@ type entity struct {
 
 	baseValues map[string]float64
 
-	effects []classes.Effect
-	rules   []classes.Rule
+	effects    map[string]classes.Effect
+	rules      map[string]classes.Rule
+	reductions map[string]classes.Reduction
 }
 
 func NewEntity() classes.Entity {
 	return &entity{
 		variableContext: variable.NewContext(),
 		baseValues:      map[string]float64{},
-		effects:         []classes.Effect{},
+		effects:         map[string]classes.Effect{},
+		rules:           map[string]classes.Rule{},
+		reductions:      map[string]classes.Reduction{},
 	}
 }
 
@@ -49,105 +53,106 @@ func (ent *entity) SetBaseValues(vars map[string]float64) {
 	ent.Reset()
 
 	for id, value := range vars {
-		if dataVar := ent.VariableContext().DataVariable(id); dataVar != nil {
-			ent.baseValues[id] = value
-		} else {
-			logging.Warning.Println("Attempting to set non-data variable", id, ", skipping")
-		}
+		ent.baseValues[id] = value
 	}
 
 	ent.Calculate()
 }
 
-func (ent *entity) RuleDependencyOrdering() ([]classes.Rule, error) {
-	queue := []classes.Rule{}
-	sortedList := []classes.Rule{}
+func (ent *entity) ReductionDependencyOrdering() ([]classes.Reduction, error) {
+	queue := []classes.Reduction{}
+	sortedList := []classes.Reduction{}
 
-	// given a ruleid, number of dependencies left to evaluate for it before we
+	// given a reductionid, number of dependencies left to evaluate for it before we
 	// can safely enqueue it
 	depsLeft := map[string]int{}
 
-	// given a varname, what rules are modified by that variable
-	varMods := map[string][]classes.Rule{}
-	// given a varname, what rules does that variable depend on
-	varDeps := map[string][]classes.Rule{}
+	// given a varname, what reductions are modified by that variable
+	varMods := map[string][]classes.Reduction{}
+	// given a varname, what reductions does that variable depend on
+	varDeps := map[string][]classes.Reduction{}
 
 	// first pass, initialize leaves into queue and varMods/varDeps
-	for _, rule := range ent.rules {
-		depVars := rule.Dependencies(ent)
-		modVars := rule.Modifies(ent)
-		if len(depVars) == 0 {
-			queue = append(queue, rule)
-		}
+	for _, reduction := range ent.reductions {
+		depVars := reduction.Dependencies(ent)
+		modVars := reduction.Modifies(ent)
 
 		for _, depVar := range depVars {
-			varMods[depVar.Id()] = append(varMods[depVar.Id()], rule)
+			varMods[depVar.Id()] = append(varMods[depVar.Id()], reduction)
 		}
 		for _, modVar := range modVars {
-			varDeps[modVar.Id()] = append(varDeps[modVar.Id()], rule)
+			varDeps[modVar.Id()] = append(varDeps[modVar.Id()], reduction)
 		}
 	}
 
-	// util functions to easily get an array of deps/mods for each rule
+	// util functions to easily get an array of dep/mod reductions for each
+	// reduction
 	// these only work once varMods/varDeps are populated
-	getMods := func(curRule classes.Rule) []classes.Rule {
-		modVars := curRule.Modifies(ent)
-		allMods := map[classes.Rule]bool{}
+	getMods := func(curReduction classes.Reduction) []classes.Reduction {
+		modVars := curReduction.Modifies(ent)
+		allMods := map[classes.Reduction]bool{}
 
 		for _, modVar := range modVars {
-			for _, modRule := range varMods[modVar.Id()] {
-				allMods[modRule] = true
+			for _, modReduction := range varMods[modVar.Id()] {
+				allMods[modReduction] = true
 			}
 		}
 
-		ret := make([]classes.Rule, 0, len(allMods))
+		ret := make([]classes.Reduction, 0, len(allMods))
 		for k := range allMods {
 			ret = append(ret, k)
 		}
 		return ret
 	}
-	getDeps := func(curRule classes.Rule) []classes.Rule {
-		depVars := curRule.Dependencies(ent)
-		allDeps := map[classes.Rule]bool{}
+	getDeps := func(curReduction classes.Reduction) []classes.Reduction {
+		depVars := curReduction.Dependencies(ent)
+		allDeps := map[classes.Reduction]bool{}
 
 		for _, depVar := range depVars {
-			for _, depRule := range varDeps[depVar.Id()] {
-				allDeps[depRule] = true
+			for _, depReduction := range varDeps[depVar.Id()] {
+				allDeps[depReduction] = true
 			}
 		}
 
-		ret := make([]classes.Rule, 0, len(allDeps))
+		ret := make([]classes.Reduction, 0, len(allDeps))
 		for k := range allDeps {
 			ret = append(ret, k)
 		}
 		return ret
 	}
 
+	// queue up all the leaf reductions (those without dependenies)
+	for _, reduction := range ent.reductions {
+		if len(getDeps(reduction)) == 0 {
+			queue = append(queue, reduction)
+		}
+	}
+
 	// second pass, use varMods/varDeps to populate
-	for _, rule := range ent.rules {
-		deps := getDeps(rule)
-		depsLeft[rule.Id()] = len(deps)
+	for _, reduction := range ent.reductions {
+		deps := getDeps(reduction)
+		depsLeft[reduction.Id()] = len(deps)
 	}
 
 	// go through the queue, enqueueing things
 	for len(queue) > 0 {
-		curRule := queue[len(queue)-1]
+		curReduction := queue[len(queue)-1]
 		queue = queue[:len(queue)-1]
-		sortedList = append(sortedList, curRule)
+		sortedList = append(sortedList, curReduction)
 
-		for _, modRule := range getMods(curRule) {
+		for _, modReduction := range getMods(curReduction) {
 			// decrement the number untraversed incoming edges
-			depsLeft[modRule.Id()] -= 1
+			depsLeft[modReduction.Id()] -= 1
 			// if we're out of untraversed incoming edges then enqueue
-			if depsLeft[modRule.Id()] == 0 {
+			if depsLeft[modReduction.Id()] == 0 {
 				// I guess technically it's a stack because the ordering don't mattuh
-				queue = append(queue, modRule)
+				queue = append(queue, modReduction)
 			}
 		}
 	}
 
-	// if any of our rules still have untraversed incoming edges then we have a
-	// cycle (we weren't able to traverse all the rules)
+	// if any of our reductions still have untraversed incoming edges then we have a
+	// cycle (we weren't able to traverse all the reductions)
 	for _, depsLeft := range depsLeft {
 		if depsLeft > 0 {
 			return nil, fmt.Errorf("Cannot toposort - dependency graph has cycles")
@@ -161,30 +166,40 @@ func (ent *entity) RuleDependencyOrdering() ([]classes.Rule, error) {
 func (ent *entity) Reset() {
 	ent.variableContext = variable.NewContext()
 
-	// evaluate all effects to instantiate variables
+	// reset all rules
+	ent.rules = map[string]classes.Rule{}
+
+	// evaluate all effects to get rules
 	for _, eff := range ent.effects {
-		//TODO: next up is effects add rules
-		eff.OnEffect(ent)
+		for _, rule := range eff.Rules() {
+			ent.rules[rule.Id()] = rule
+		}
+	}
+
+	// evaluate all rules to get reductions and variables
+	for _, rule := range ent.rules {
+		rule.Eval(ent)
 	}
 }
 
 func (ent *entity) Calculate() {
 	// apply base values
 	for valueVar, baseValue := range ent.baseValues {
-		if dataVar := ent.variableContext.DataVariable(valueVar); dataVar != nil {
-			dataVar.SetValue(baseValue)
+		if dataVar := ent.variableContext.Variable(valueVar); dataVar == nil {
+			ent.variableContext.SetDataVariable(valueVar, baseValue)
 		} else {
-			logging.Warning.Println("Entity base value was not a data variable")
+			logging.Warning.Println("Attempting to set non-data variable", valueVar, " with basevalues, skipping")
 		}
 	}
 
 	// evaluate all variable nodes in dependency order
-	orderedRules, err := ent.RuleDependencyOrdering()
+	orderedReductions, err := ent.ReductionDependencyOrdering()
 	if err != nil {
 		logging.Error.Println(err)
 	}
-	for _, rule := range orderedRules {
-		rule.Eval(ent)
+	logging.Warning.Println(orderedReductions)
+	for _, reduction := range orderedReductions {
+		reduction.Eval(ent)
 	}
 }
 
@@ -194,7 +209,11 @@ func (ent *entity) Recalculate() {
 }
 
 func (ent *entity) AddEffect(eff classes.Effect) {
-	ent.effects = append(ent.effects, eff)
+	if eff != nil {
+		ent.effects[eff.Id()] = eff
+	} else {
+		logging.Warning.Println("Tried to add nil effect to entity")
+	}
 }
 
 func (ent *entity) variableFromV8Object(obj *v8.Object) (classes.Variable, error) {
@@ -211,6 +230,18 @@ func (ent *entity) dataVariableFromV8Object(obj *v8.Object) (classes.Variable, e
 	)
 }
 
+func (ent *entity) reductionFromV8Object(obj *v8.Object) (classes.Reduction, error) {
+	id := scripting.StringFromV8Object(obj, "id", "")
+	newRed := reduction.NewReduction(
+		id,
+		scripting.StringArrFromV8Object(obj, "depends", []string{}),
+		scripting.StringArrFromV8Object(obj, "modifies", []string{}),
+		reduction.MakeV8EvalFn(scripting.FnFromV8Object(obj, "eval", nil)),
+	)
+	ent.reductions[id] = newRed
+	return newRed, nil
+}
+
 func (ent *entity) V8VariableAccessor() *v8.ObjectTemplate {
 	return nil
 }
@@ -218,19 +249,14 @@ func (ent *entity) V8VariableAccessor() *v8.ObjectTemplate {
 func (ent *entity) V8Accessor() *v8.ObjectTemplate {
 	engine := scripting.GetEngine()
 
+	reductionTemplate := engine.NewObjectTemplate()
+	reductionTemplate.Bind("new", func(obj *v8.Object) {
+		ent.reductionFromV8Object(obj)
+	})
+
 	varTemplate := engine.NewObjectTemplate()
 	varTemplate.Bind("new", func(obj *v8.Object) {
 		ent.variableFromV8Object(obj)
-	})
-
-	// a data variable is essentially a literal whose value can mutate and is
-	// not supplied in an effect
-	varTemplate.Bind("newData", func(obj *v8.Object) {
-		ent.dataVariableFromV8Object(obj)
-	})
-
-	labelTemplate := engine.NewObjectTemplate()
-	labelTemplate.Bind("new", func(fn *v8.Function) {
 	})
 
 	objTemplate := engine.NewObjectTemplate()
@@ -246,14 +272,14 @@ func (ent *entity) V8Accessor() *v8.ObjectTemplate {
 		nil,
 		v8.PA_ReadOnly,
 	)
-	objTemplate.SetAccessor("labels",
+	objTemplate.SetAccessor("reductions",
 		// get
 		func(name string, info v8.AccessorCallbackInfo) {
-			info.ReturnValue().Set(engine.NewInstanceOf(labelTemplate))
+			info.ReturnValue().Set(engine.NewInstanceOf(reductionTemplate))
 		},
 		// set
 		func(name string, value *v8.Value, info v8.AccessorCallbackInfo) {
-			logging.Warning.Println("Attempted to overwrite entity.labels")
+			logging.Warning.Println("Attempted to overwrite entity.reductions")
 		},
 		nil,
 		v8.PA_ReadOnly,

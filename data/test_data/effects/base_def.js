@@ -25,14 +25,25 @@ var cha_skills = ["skill_bluff", "skill_diplomacy", "skill_disguise",
 
 define.rule({
   id: "baseStatsModifiers",
-  depends: ability_scores,
-  modifies: ["str_mod"],
-  eval: function(deps, mods) {
-    mods.str_mod(Math.round((deps.str - 10)/2));
+  eval: function(entity) {
+    entity.vars.new({
+      id: "str_mod",
+      init: 0,
+    });
+    entity.reductions.new({
+      id: "baseStatsModifiers",
+      depends: ability_scores.map(function(stat) { return stat+"_base";}),
+      modifies: ["str_mod"],
+      eval: function(deps, mods) {
+        mods.str_mod.add(Math.round((deps.str_base - 10)/2));
+      },
+    })
   },
 })
 
 define.effect({
   id: "baseEntityRules",
+  displayName: "Base Rules",
+  displayType: "yep",
   rules: ["baseStatsModifiers"],
 })

@@ -24,8 +24,13 @@ type Ruleset interface {
 type ruleset struct {
 	effects map[string]classes.Effect
 	rules   map[string]classes.Rule
+}
 
-	v8context *v8.Context
+type intermediateEffect struct {
+	id          string
+	displayName string
+	displayType string
+	ruleIds     []string
 }
 
 func NewRuleset() Ruleset {
@@ -33,7 +38,6 @@ func NewRuleset() Ruleset {
 		effects: map[string]classes.Effect{},
 		rules:   map[string]classes.Rule{},
 	}
-	ret.constructGlobalContext()
 
 	return ret
 }
@@ -54,8 +58,8 @@ func (rs *ruleset) Rules() map[string]classes.Rule {
 
 // read all js files from data/effects to make effects
 func (rs *ruleset) ReadData(root string) error {
-	effects := make([]classes.Effect, 0)
 
+	intermediateEffects := map[string]intermediateEffect{}
 	err := filepath.Walk(root, func(path string, f os.FileInfo, err error) error {
 		if path[len(path)-3:] == ".js" {
 			logging.Info.Println("Loading:", path)
@@ -67,7 +71,7 @@ func (rs *ruleset) ReadData(root string) error {
 			engine := scripting.GetEngine()
 
 			compiledScript := engine.Compile(bytes, nil)
-			context := rs.v8context
+			context := rs.constructGlobalContext(intermediateEffects)
 
 			cbChan := make(chan int)
 			go context.Scope(func(cs v8.ContextScope) {
@@ -79,8 +83,20 @@ func (rs *ruleset) ReadData(root string) error {
 		return nil
 	})
 
-	for _, effect := range effects {
-		rs.effects[effect.Id()] = effect
+	for effId, intEffect := range intermediateEffects {
+		rules := []classes.Rule{}
+		for _, ruleId := range intEffect.ruleIds {
+			realRule, ruleExists := rs.rules[ruleId]
+			if ruleExists {
+				rules = append(rules, realRule)
+			}
+		}
+		rs.effects[effId] = effect.NewScriptEffect(
+			intEffect.id,
+			intEffect.displayName,
+			intEffect.displayType,
+			rules,
+		)
 	}
 
 	return err
@@ -89,7 +105,8 @@ func (rs *ruleset) ReadData(root string) error {
 /*
 Construct the global scope's object template
 */
-func (rs *ruleset) constructGlobalContext() {
+func (rs *ruleset) constructGlobalContext(
+	intermediateEffects map[string]intermediateEffect) *v8.Context {
 	engine := scripting.GetEngine()
 
 	global := engine.NewObjectTemplate()
@@ -97,24 +114,21 @@ func (rs *ruleset) constructGlobalContext() {
 	// define namespace is used to define effects etc
 	defineTemplate := engine.NewObjectTemplate()
 	defineTemplate.Bind("effect", func(obj *v8.Object) {
-		newEff := effect.NewScriptEffect(
-			scripting.StringFromV8Object(obj, "id", "defaultId"),
-			scripting.StringFromV8Object(obj, "displayName", "unnamed"),
-			scripting.StringFromV8Object(obj, "displayType", "none"),
-			scripting.FnFromV8Object(obj, "onEffect", nil),
-		)
+		newEff := intermediateEffect{
+			id:          scripting.StringFromV8Object(obj, "id", "defaultId"),
+			displayName: scripting.StringFromV8Object(obj, "displayName", "unnamed"),
+			displayType: scripting.StringFromV8Object(obj, "displayType", "none"),
+			ruleIds:     scripting.StringArrFromV8Object(obj, "rules", []string{}),
+		}
 		// TODO: check for id collision
-		rs.effects[newEff.Id()] = newEff
+		intermediateEffects[newEff.id] = newEff
 	})
+
 	defineTemplate.Bind("rule", func(obj *v8.Object) {
 		newRule := rule.NewRule(
 			scripting.StringFromV8Object(obj, "id", "defaultId"),
-			scripting.StringArrFromV8Object(obj, "depends", []string{}),
-			scripting.StringArrFromV8Object(obj, "modifies", []string{}),
-			rule.MakeV8EvalFn(scripting.FnFromV8Object(obj, "onEval", nil)),
+			rule.MakeV8RuleEvalFn(scripting.FnFromV8Object(obj, "eval", nil)),
 		)
-		logging.Trace.Println(newRule)
-
 		rs.rules[newRule.Id()] = newRule
 	})
 	global.SetAccessor("define",
@@ -147,5 +161,5 @@ func (rs *ruleset) constructGlobalContext() {
 		v8.PA_ReadOnly,
 	)
 
-	rs.v8context = engine.NewContext(global)
+	return engine.NewContext(global)
 }

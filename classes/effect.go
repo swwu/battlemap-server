@@ -16,5 +16,6 @@ type Effect interface {
 	DisplayName() string
 	DisplayType() string
 
-	OnEffect(ent V8AccessorProvider)
+	RuleIds() []string
+	Rules() []Rule
 }

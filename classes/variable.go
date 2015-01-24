@@ -1,5 +1,9 @@
 package classes
 
+import (
+	"github.com/swwu/v8.go"
+)
+
 type VariableContext interface {
 	Variable(id string) Variable
 	DataVariable(id string) DataVariable
@@ -24,11 +28,11 @@ type DataVariable interface {
 type ReducerVariable interface {
 	Variable
 	AddReducerOp(op ReducerOp)
+	V8Accessor() *v8.ObjectTemplate
 }
 
 type ReducerOp interface {
-	Effect() Effect
 	Condition() bool
 	Precedence() int
-	//Reduce(orig float64)
+	Reduce(orig float64) float64
 }

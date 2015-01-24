@@ -1,27 +1,22 @@
 package effect
 
-import (
-	"github.com/swwu/v8.go"
-
-	"github.com/swwu/battlemap-server/classes"
-	"github.com/swwu/battlemap-server/scripting"
-)
+import "github.com/swwu/battlemap-server/classes"
 
 // javascript-code effect
 type scriptEffect struct {
 	id          string
 	displayName string
 	displayType string
-	onEffectFn  *v8.Function
+	rules       []classes.Rule
 }
 
 func NewScriptEffect(id string, displayName string, displayType string,
-	onEffectFn *v8.Function) classes.Effect {
+	rules []classes.Rule) classes.Effect {
 	return &scriptEffect{
 		id:          id,
 		displayName: displayName,
 		displayType: displayType,
-		onEffectFn:  onEffectFn,
+		rules:       rules,
 	}
 }
 
@@ -37,23 +32,14 @@ func (eff *scriptEffect) DisplayType() string {
 	return eff.displayType
 }
 
-func (eff *scriptEffect) OnEffect(ent classes.V8AccessorProvider) {
-	if eff.onEffectFn == nil {
-		// function is nil? nothing to do
-		return
+func (eff *scriptEffect) RuleIds() []string {
+	ret := make([]string, 0, len(eff.rules))
+	for _, rule := range eff.rules {
+		ret = append(ret, rule.Id())
 	}
+	return []string{}
+}
 
-	engine := scripting.GetEngine()
-	objTemplate := ent.V8Accessor()
-
-	context := engine.NewContext(nil)
-
-	cbChan := make(chan int)
-	go context.Scope(func(cs v8.ContextScope) {
-		eff.onEffectFn.Call(engine.NewInstanceOf(objTemplate))
-		cbChan <- 1
-	})
-
-	<-cbChan
-
+func (eff *scriptEffect) Rules() []classes.Rule {
+	return eff.rules
 }

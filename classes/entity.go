@@ -12,7 +12,7 @@ type Entity interface {
 
 	SetBaseValues(vars map[string]float64)
 
-	RuleDependencyOrdering() ([]Rule, error)
+	ReductionDependencyOrdering() ([]Reduction, error)
 
 	Reset()
 	Calculate()
